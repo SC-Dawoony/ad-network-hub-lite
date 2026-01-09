@@ -4,7 +4,8 @@ This component handles the IronSource-specific workflow of deactivating (pausing
 after creating an app, before creating new units.
 """
 import streamlit as st
-from utils.network_manager import get_network_manager, handle_api_response
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
 from utils.ad_network_query import get_ironsource_units
 
 

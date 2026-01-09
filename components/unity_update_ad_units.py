@@ -4,7 +4,8 @@ This component handles the Unity-specific workflow of archiving existing ad unit
 after creating a Unity project, before creating new units.
 """
 import streamlit as st
-from utils.network_manager import get_network_manager, handle_api_response
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
 
 
 def render_unity_update_ad_units(current_network: str):

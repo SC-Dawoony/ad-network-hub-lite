@@ -3,8 +3,9 @@ from typing import Dict, List, Optional
 import requests
 import json
 import logging
-from .base_network_api import BaseNetworkAPI, _get_env_var, _mask_sensitive_data
+from .base_network_api import BaseNetworkAPI
 from ..network_auth.ironsource_auth import IronSourceAuth
+from utils.helpers import get_env_var, mask_sensitive_data
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class IronSourceAPI(BaseNetworkAPI):
     def __init__(self):
         super().__init__("IronSource")
         self.auth = IronSourceAuth()
-    
+   
     def create_app(self, payload: Dict) -> Dict:
         """Create app via IronSource API"""
         headers = self.auth.get_headers()
@@ -42,8 +43,8 @@ class IronSourceAPI(BaseNetworkAPI):
                 self.logger.warning("[IronSource] Received 401 Unauthorized. Token may be expired. Attempting to refresh...")
                 
                 # Try to refresh token
-                refresh_token = _get_env_var("IRONSOURCE_REFRESH_TOKEN")
-                secret_key = _get_env_var("IRONSOURCE_SECRET_KEY")
+                refresh_token = get_env_var("IRONSOURCE_REFRESH_TOKEN")
+                secret_key = get_env_var("IRONSOURCE_SECRET_KEY")
                 
                 if refresh_token and secret_key:
                     new_token = self.auth.refresh_token(refresh_token, secret_key)
@@ -162,7 +163,7 @@ class IronSourceAPI(BaseNetworkAPI):
         self.logger.info(f"[IronSource] API Request: POST {url}")
         masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
         self.logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        self.logger.info(f"[IronSource] Request Body: {json.dumps(_mask_sensitive_data(ad_units), indent=2)}")
+        self.logger.info(f"[IronSource] Request Body: {json.dumps(make_sensitive_data(ad_units), indent=2)}")
         
         try:
             # API accepts an array of ad units
@@ -202,7 +203,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
             except json.JSONDecodeError as e:
                 # Invalid JSON response
                 self.logger.error(f"[IronSource] JSON decode error: {str(e)}")
@@ -304,7 +305,7 @@ class IronSourceAPI(BaseNetworkAPI):
         self.logger.info(f"[IronSource] API Request: PUT {url}")
         masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
         self.logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        self.logger.info(f"[IronSource] Request Body: {json.dumps(_mask_sensitive_data(ad_units), indent=2)}")
+        self.logger.info(f"[IronSource] Request Body: {json.dumps(make_sensitive_data(ad_units), indent=2)}")
         
         try:
             # API accepts an array of ad units
@@ -344,7 +345,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
             except json.JSONDecodeError as e:
                 # Invalid JSON response
                 self.logger.error(f"[IronSource] JSON decode error: {str(e)}")
@@ -485,7 +486,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
                 
                 # Normalize response - should be a list
                 instances = result if isinstance(result, list) else result.get("instances", result.get("data", result.get("list", [])))
@@ -565,11 +566,11 @@ class IronSourceAPI(BaseNetworkAPI):
             
             # Build query parameters (optional) - reference code 방식
             params = {}
-            platform = _get_env_var("IRONSOURCE_PLATFORM")  # ios / android
+            platform = get_env_var("IRONSOURCE_PLATFORM")  # ios / android
             if platform:
                 params['platform'] = platform
             
-            app_status = _get_env_var("IRONSOURCE_APP_STATUS")  # Active / archived
+            app_status = get_env_var("IRONSOURCE_APP_STATUS")  # Active / archived
             if app_status:
                 params['appStatus'] = app_status
             
@@ -590,7 +591,7 @@ class IronSourceAPI(BaseNetworkAPI):
             
             if response.status_code == 200:
                 result = response.json()
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
                 
                 # IronSource API 응답 형식에 맞게 파싱
                 # 응답은 JSON 배열 또는 객체일 수 있음

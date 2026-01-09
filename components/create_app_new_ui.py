@@ -3,7 +3,9 @@ import streamlit as st
 import logging
 from typing import Dict, List, Optional, Tuple
 from utils.session_manager import SessionManager
-from utils.network_manager import get_network_manager, handle_api_response, _mask_sensitive_data
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
+from utils.helpers import mask_sensitive_data
 from network_configs import get_network_config, get_network_display_names, NETWORK_REGISTRY
 from utils.app_store_helper import get_ios_app_details, get_android_app_details
 

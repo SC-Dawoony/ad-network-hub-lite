@@ -7,7 +7,6 @@ from components.one_click.category_matchers import (
     match_fyber_ios_category
 )
 
-
 def render_network_required_fields(network: str, config, fetched_info: Dict, key_prefix: str = "one_click") -> Dict:
     """Render network-specific required fields that can't be fetched from store
     

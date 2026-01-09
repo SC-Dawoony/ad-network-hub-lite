@@ -8,7 +8,8 @@ import logging
 import json
 import re
 from typing import Dict, List, Optional, Tuple
-from utils.network_manager import get_network_manager, _get_env_var
+from utils.network_manager import get_network_manager
+from utils.helpers import get_env_var
 
 logger = logging.getLogger(__name__)
 
@@ -1030,9 +1031,9 @@ def get_inmobi_units(app_id: str) -> List[Dict]:
     """
     try:
         # InMobi uses x-client-id, x-account-id, x-client-secret headers
-        username = _get_env_var("INMOBI_USERNAME")
-        account_id = _get_env_var("INMOBI_ACCOUNT_ID")
-        client_secret = _get_env_var("INMOBI_CLIENT_SECRET")
+        username = get_env_var("INMOBI_USERNAME")
+        account_id = get_env_var("INMOBI_ACCOUNT_ID")
+        client_secret = get_env_var("INMOBI_CLIENT_SECRET")
         
         if not username or not account_id or not client_secret:
             logger.error("[InMobi] Cannot get units: INMOBI_USERNAME, INMOBI_ACCOUNT_ID, and INMOBI_CLIENT_SECRET must be set")
@@ -1125,8 +1126,8 @@ def get_mintegral_units(app_id: str) -> List[Dict]:
     """
     try:
         # Mintegral API 인증: skey, time, sign
-        skey = _get_env_var("MINTEGRAL_SKEY")
-        secret = _get_env_var("MINTEGRAL_SECRET")
+        skey = get_env_var("MINTEGRAL_SKEY")
+        secret = get_env_var("MINTEGRAL_SECRET")
         
         if not skey or not secret:
             logger.error("[Mintegral] Cannot get units: MINTEGRAL_SKEY and MINTEGRAL_SECRET must be set")
@@ -1225,8 +1226,8 @@ def get_mintegral_units_by_placement(placement_id: int) -> List[Dict]:
     """
     try:
         # Mintegral API 인증: skey, time, sign
-        skey = _get_env_var("MINTEGRAL_SKEY")
-        secret = _get_env_var("MINTEGRAL_SECRET")
+        skey = get_env_var("MINTEGRAL_SKEY")
+        secret = get_env_var("MINTEGRAL_SECRET")
         
         if not skey or not secret:
             logger.error("[Mintegral] Cannot get units by placement: MINTEGRAL_SKEY and MINTEGRAL_SECRET must be set")
@@ -1419,8 +1420,8 @@ def get_bigoads_units(app_code: str) -> List[Dict]:
         
         network_manager = get_network_manager()
         # Access private method through the instance
-        developer_id = _get_env_var("BIGOADS_DEVELOPER_ID")
-        token = _get_env_var("BIGOADS_TOKEN")
+        developer_id = get_env_var("BIGOADS_DEVELOPER_ID")
+        token = get_env_var("BIGOADS_TOKEN")
         
         if not developer_id or not token:
             logger.error("[BigOAds] Cannot get units: BIGOADS_DEVELOPER_ID and BIGOADS_TOKEN must be set")

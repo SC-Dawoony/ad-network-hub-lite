@@ -4,7 +4,9 @@ import logging
 from typing import List, Tuple
 from utils.session_manager import SessionManager
 from utils.ui_components import DynamicFormRenderer
-from utils.network_manager import get_network_manager, handle_api_response, _mask_sensitive_data
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
+from utils.helpers import mask_sensitive_data
 from utils.validators import validate_app_name, validate_package_name, validate_url
 from network_configs import get_network_config
 

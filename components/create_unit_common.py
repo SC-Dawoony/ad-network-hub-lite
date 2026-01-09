@@ -3,7 +3,7 @@ import streamlit as st
 import logging
 import re
 from utils.session_manager import SessionManager
-from utils.network_manager import handle_api_response
+from utils.ui_helpers import handle_api_response
 from components.create_app_helpers import (
     normalize_platform_str as _normalize_platform_str,
     generate_slot_name as _generate_slot_name,

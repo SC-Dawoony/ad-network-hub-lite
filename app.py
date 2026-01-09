@@ -1,12 +1,13 @@
 """Main Streamlit app - Ad Network Management Hub"""
 import streamlit as st
-from datetime import datetime
 import os
 from typing import Optional
 from pathlib import Path
 from utils.session_manager import SessionManager
 from utils.network_manager import get_network_manager
 from network_configs import get_available_networks, get_network_display_names, get_network_config
+from utils.helpers import get_env_var
+
 
 
 def switch_to_page(page_filename: str):
@@ -98,12 +99,7 @@ with st.sidebar:
         
         # Helper function to get env vars from Streamlit secrets or .env
         def get_env(key: str) -> Optional[str]:
-            try:
-                if hasattr(st, 'secrets') and st.secrets and key in st.secrets:
-                    return st.secrets[key]
-            except:
-                pass
-            return os.getenv(key)
+            return get_env_var(key)
         
         # Check if network credentials are set
         if network == "ironsource":

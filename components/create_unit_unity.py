@@ -3,7 +3,9 @@ import streamlit as st
 import logging
 import json
 from utils.session_manager import SessionManager
-from utils.network_manager import get_network_manager, handle_api_response, _mask_sensitive_data
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
+from utils.helpers import mask_sensitive_data
 
 logger = logging.getLogger(__name__)
 

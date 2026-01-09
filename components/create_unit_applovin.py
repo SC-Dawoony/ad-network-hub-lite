@@ -1,7 +1,8 @@
 """AppLovin Create Unit UI component"""
 import streamlit as st
 from utils.session_manager import SessionManager
-from utils.network_manager import get_network_manager, handle_api_response
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
 
 
 def render_applovin_create_unit_ui():

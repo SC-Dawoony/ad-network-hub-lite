@@ -1,144 +1,14 @@
-"""Network manager wrapper for API calls"""
-from typing import Dict, List, Optional
-import streamlit as st
-import os
-import sys
-import requests
-import time
-import random
-import hashlib
-import json
+"""Network Manager - Centralized API client management"""
 import logging
+import json
+import requests
 import base64
-from dotenv import load_dotenv
+import time
+import hashlib
+from typing import Dict, List, Optional, Any
+from utils.helpers import get_env_var, mask_sensitive_data
 
-
-def _get_env_var(key: str) -> Optional[str]:
-    """
-    Get environment variable from Streamlit secrets (if available) or .env file
-    
-    Args:
-        key: Environment variable key
-        
-    Returns:
-        Environment variable value or None
-    """
-    # Try Streamlit secrets first (for Streamlit Cloud)
-    try:
-        if hasattr(st, 'secrets') and st.secrets:
-            # Log available secrets keys for debugging
-            try:
-                if hasattr(st.secrets, 'keys'):
-                    available_keys = list(st.secrets.keys())
-                    logger.info(f"[Env] Available Streamlit secrets keys: {available_keys}")
-                elif isinstance(st.secrets, dict):
-                    available_keys = list(st.secrets.keys())
-                    logger.info(f"[Env] Available Streamlit secrets keys: {available_keys}")
-            except Exception as e:
-                logger.warning(f"[Env] Could not list secrets keys: {str(e)}")
-            
-            # Try direct access first
-            try:
-                if key in st.secrets:
-                    value = st.secrets[key]
-                    logger.info(f"[Env] Found {key} in Streamlit secrets (length: {len(str(value)) if value else 0})")
-                    return str(value) if value is not None else None
-            except (KeyError, AttributeError, TypeError) as e:
-                logger.debug(f"[Env] Direct access failed for {key}: {str(e)}")
-            
-            # Try using .get() method if available
-            try:
-                if hasattr(st.secrets, 'get'):
-                    value = st.secrets.get(key)
-                    if value is not None:
-                        logger.info(f"[Env] Found {key} in Streamlit secrets via .get() (length: {len(str(value))})")
-                        return str(value)
-            except Exception as e:
-                logger.debug(f"[Env] .get() method failed for {key}: {str(e)}")
-            
-            # Try nested access (e.g., st.secrets["ironsource"]["SECRET_KEY"])
-            try:
-                if isinstance(st.secrets, dict):
-                    for top_level_key in st.secrets.keys():
-                        try:
-                            nested_dict = st.secrets[top_level_key]
-                            if isinstance(nested_dict, dict) and key in nested_dict:
-                                value = nested_dict[key]
-                                logger.info(f"[Env] Found {key} in Streamlit secrets[{top_level_key}] (length: {len(str(value)) if value else 0})")
-                                return str(value) if value is not None else None
-                        except (KeyError, AttributeError, TypeError):
-                            continue
-            except Exception as e:
-                logger.debug(f"[Env] Nested access failed for {key}: {str(e)}")
-            
-            logger.warning(f"[Env] {key} not found in Streamlit secrets")
-    except Exception as e:
-        logger.warning(f"[Env] Error accessing Streamlit secrets: {str(e)}")
-    
-    # Fallback to environment variables (from .env file or system env)
-    env_value = os.getenv(key)
-    if env_value:
-        logger.info(f"[Env] Found {key} in environment variables (length: {len(env_value)})")
-    else:
-        logger.warning(f"[Env] {key} not found in environment variables")
-    return env_value
-
-# Load environment variables (override to get latest values)
-# Streamlit Cloud에서는 st.secrets 사용, 로컬에서는 .env 파일 사용
-try:
-    import streamlit as st
-    # Streamlit Cloud 환경에서는 secrets가 자동으로 로드됨
-    # 로컬에서는 .env 파일 로드
-    if not hasattr(st, 'secrets') or not st.secrets:
-        load_dotenv(override=True)
-except:
-    # Streamlit이 없는 환경 (예: 테스트)
-    load_dotenv(override=True)
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
-
-
-def _mask_sensitive_data(data) -> Dict:
-    """Mask sensitive data in request/response for logging
-    
-    Args:
-        data: Dict, List, or None to mask
-        
-    Returns:
-        Masked data (Dict or List)
-    """
-    if data is None:
-        return {}
-    
-    # Handle list data
-    if isinstance(data, list):
-        return [_mask_sensitive_data(item) if isinstance(item, dict) else item for item in data]
-    
-    # Handle dict data
-    if not isinstance(data, dict):
-        return data
-    
-    masked = data.copy()
-    sensitive_keys = ['security_key', 'sign', 'token', 'authorization', 'bearer_token', 
-                     'refresh_token', 'secret_key', 'api_key', 'password']
-    
-    for key in sensitive_keys:
-        if key in masked:
-            masked[key] = "***MASKED***"
-    
-    # Also mask keys that contain these words
-    for key in list(masked.keys()):
-        key_lower = key.lower()
-        if any(sensitive in key_lower for sensitive in ['token', 'key', 'secret', 'password', 'sign']):
-            if not isinstance(masked[key], (int, float)):
-                masked[key] = "***MASKED***"
-    
-    return masked
 
 # Note: This is a placeholder for the actual AdNetworkManager
 # In a real implementation, this would import from BE/services/ad_network_manager.py
@@ -176,7 +46,7 @@ class MockNetworkManager:
         
         # Mock implementation for other networks
         logger.info(f"[{network.title()}] API Request: Create App (Mock)")
-        logger.info(f"[{network.title()}] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[{network.title()}] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         mock_response = {
             "status": 0,
@@ -248,8 +118,8 @@ class MockNetworkManager:
         Optional: IRONSOURCE_BEARER_TOKEN (if exists and valid, use it)
         """
         # Get credentials (required)
-        refresh_token = _get_env_var("IRONSOURCE_REFRESH_TOKEN")
-        secret_key = _get_env_var("IRONSOURCE_SECRET_KEY")
+        refresh_token = get_env_var("IRONSOURCE_REFRESH_TOKEN")
+        secret_key = get_env_var("IRONSOURCE_SECRET_KEY")
         
         # Log what we found
         logger.info(f"[IronSource] Checking credentials...")
@@ -267,7 +137,7 @@ class MockNetworkManager:
             return None
         
         # Check if we have a cached bearer token (optional)
-        bearer_token = _get_env_var("IRONSOURCE_BEARER_TOKEN") or _get_env_var("IRONSOURCE_API_TOKEN")
+        bearer_token = get_env_var("IRONSOURCE_BEARER_TOKEN") or get_env_var("IRONSOURCE_API_TOKEN")
         
         # If bearer token exists, check if it's still valid (1 hour buffer)
         if bearer_token:
@@ -321,7 +191,7 @@ class MockNetworkManager:
             
             logger.info(f"[IronSource] Attempting to get bearer token...")
             logger.info(f"[IronSource] Token URL: GET {url}")
-            logger.info(f"[IronSource] Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
+            logger.info(f"[IronSource] Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
             
             response = requests.get(url, headers=headers, timeout=30)
             
@@ -395,7 +265,7 @@ class MockNetworkManager:
         Note: payload from build_app_payload() contains only user-input fields.
         This method adds authentication fields: timestamp, nonce, sign, version, status.
         """
-        security_key = _get_env_var("PANGLE_SECURITY_KEY")
+        security_key = get_env_var("PANGLE_SECURITY_KEY")
         
         if not security_key:
             logger.error("[Pangle] PANGLE_SECURITY_KEY not found in environment")
@@ -413,8 +283,8 @@ class MockNetworkManager:
         
         if not user_id or not role_id:
             # Fallback to .env if not in payload
-            user_id = _get_env_var("PANGLE_USER_ID")
-            role_id = _get_env_var("PANGLE_ROLE_ID")
+            user_id = get_env_var("PANGLE_USER_ID")
+            role_id = get_env_var("PANGLE_ROLE_ID")
             if not user_id or not role_id:
                 return {
                     "status": 1,
@@ -452,7 +322,7 @@ class MockNetworkManager:
         
         # Check if sandbox mode is enabled (before building request_params)
         # Default to Production (false) if not set
-        sandbox_env = _get_env_var("PANGLE_SANDBOX")
+        sandbox_env = get_env_var("PANGLE_SANDBOX")
         sandbox = sandbox_env and sandbox_env.lower() == "true" if sandbox_env else False
         logger.info(f"[Pangle] PANGLE_SANDBOX: {sandbox_env if sandbox_env else 'not set (default: Production)'}")
         
@@ -518,7 +388,7 @@ class MockNetworkManager:
         if sign != sign.lower():
             logger.warning(f"[Pangle] WARNING: Signature contains uppercase characters!")
         
-        masked_params = _mask_sensitive_data(request_params.copy())
+        masked_params = mask_sensitive_data(request_params.copy())
         # Also mask sign in logging
         if "sign" in masked_params:
             masked_params["sign"] = "***MASKED***"
@@ -771,7 +641,7 @@ class MockNetworkManager:
         
         # Mock implementation for other networks
         logger.info(f"[{network.title()}] API Request: Create Unit (Mock)")
-        logger.info(f"[{network.title()}] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[{network.title()}] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         mock_response = {
             "status": 0,
@@ -798,150 +668,6 @@ class MockNetworkManager:
             from utils.network_apis.ironsource_api import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.create_placements(app_key, ad_units)
-    
-    def _create_ironsource_placements_old(self, app_key: str, ad_units: List[Dict]) -> Dict:
-        """Create placements via IronSource API (OLD - kept for reference)
-        
-        Args:
-            app_key: Application key from IronSource platform
-            ad_units: List of ad unit objects to create
-        """
-        headers = self._get_ironsource_headers()
-        if not headers:
-            return {
-                "status": 1,
-                "code": "AUTH_ERROR",
-                "msg": "IronSource authentication token not found. Please check IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY in .env file or Streamlit secrets."
-            }
-        
-        url = f"https://platform.ironsrc.com/levelPlay/adUnits/v1/{app_key}"
-        
-        # Validate ad_units
-        if not ad_units:
-            return {
-                "status": 1,
-                "code": "INVALID_PAYLOAD",
-                "msg": "Ad units list is empty"
-            }
-        
-        # Validate each ad unit has required fields
-        for idx, ad_unit in enumerate(ad_units):
-            if not isinstance(ad_unit, dict):
-                return {
-                    "status": 1,
-                    "code": "INVALID_PAYLOAD",
-                    "msg": f"Ad unit at index {idx} must be a dictionary"
-                }
-            if not ad_unit.get("mediationAdUnitName"):
-                return {
-                    "status": 1,
-                    "code": "INVALID_PAYLOAD",
-                    "msg": f"mediationAdUnitName is required for ad unit at index {idx}"
-                }
-            if not ad_unit.get("adFormat"):
-                return {
-                    "status": 1,
-                    "code": "INVALID_PAYLOAD",
-                    "msg": f"adFormat is required for ad unit at index {idx}"
-                }
-        
-        # Log request
-        logger.info(f"[IronSource] API Request: POST {url}")
-        masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
-        logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        logger.info(f"[IronSource] Request Body: {json.dumps(_mask_sensitive_data(ad_units), indent=2)}")
-        
-        try:
-            # API accepts an array of ad units
-            response = requests.post(url, json=ad_units, headers=headers, timeout=30)
-            
-            # Log response status
-            logger.info(f"[IronSource] Response Status: {response.status_code}")
-            
-            # Check response status before parsing
-            if response.status_code >= 400:
-                # Error response
-                try:
-                    error_body = response.json()
-                    logger.error(f"[IronSource] Error Response: {json.dumps(error_body, indent=2)}")
-                    error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or response.text
-                    error_code = error_body.get("code") or error_body.get("errorCode") or str(response.status_code)
-                except:
-                    error_msg = response.text or f"HTTP {response.status_code}"
-                    error_code = str(response.status_code)
-                    logger.error(f"[IronSource] Error Response (text): {error_msg}")
-                
-                return {
-                    "status": 1,
-                    "code": error_code,
-                    "msg": error_msg
-                }
-            
-            # Success response - handle empty or invalid JSON
-            response_text = response.text.strip()
-            if not response_text:
-                # Empty response
-                logger.warning(f"[IronSource] Empty response body (status {response.status_code})")
-                return {
-                    "status": 0,
-                    "code": 0,
-                    "msg": "Success (empty response)",
-                    "result": {}
-                }
-            
-            try:
-                result = response.json()
-                # Log response
-                logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
-            except json.JSONDecodeError as e:
-                # Invalid JSON response
-                logger.error(f"[IronSource] JSON decode error: {str(e)}")
-                logger.error(f"[IronSource] Response text: {response_text[:500]}")
-                return {
-                    "status": 1,
-                    "code": "JSON_ERROR",
-                    "msg": f"Invalid JSON response: {str(e)}. Response: {response_text[:200]}"
-                }
-            
-            # IronSource API response format may vary, normalize it
-            # Response might be an array of created ad units or a single object
-            return {
-                "status": 0,
-                "code": 0,
-                "msg": "Success",
-                "result": result
-            }
-        except requests.exceptions.RequestException as e:
-            logger.error(f"[IronSource] API Error (Placements): {str(e)}")
-            error_msg = str(e)
-            error_code = "API_ERROR"
-            
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_body = e.response.json()
-                    logger.error(f"[IronSource] Error Response: {json.dumps(error_body, indent=2)}")
-                    error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or error_msg
-                    error_code = error_body.get("code") or error_body.get("errorCode") or error_code
-                except:
-                    logger.error(f"[IronSource] Error Response (text): {e.response.text}")
-                    if e.response.text:
-                        error_msg = e.response.text
-            
-            return {
-                "status": 1,
-                "code": error_code,
-                "msg": error_msg
-            }
-        except Exception as e:
-            # Catch any other unexpected errors
-            logger.error(f"[IronSource] Unexpected Error (Placements): {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {
-                "status": 1,
-                "code": "UNEXPECTED_ERROR",
-                "msg": str(e)
-            }
     
     def _update_ironsource_ad_units(self, app_key: str, ad_units: List[Dict]) -> Dict:
         """Update (activate) ad units via IronSource API (wrapper for compatibility)
@@ -978,138 +704,6 @@ class MockNetworkManager:
             from utils.network_apis.ironsource_api import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.get_instances(app_key)
-    
-    def _get_ironsource_instances_old(self, app_key: str) -> Dict:
-        """Get instances via IronSource API (OLD - kept for reference)
-        
-        API: GET https://platform.ironsrc.com/levelPlay/network/instances/v4/
-        
-        Args:
-            app_key: Application key from IronSource platform
-        
-        Returns:
-            Dict with status, code, msg, and result (list of instances)
-        """
-        headers = self._get_ironsource_headers()
-        if not headers:
-            return {
-                "status": 1,
-                "code": "AUTH_ERROR",
-                "msg": "IronSource authentication token not found. Please check IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY in .env file or Streamlit secrets."
-            }
-        
-        # API 문서에 따르면 appKey는 path parameter로 전달 (예시: /v4/142401ac1/)
-        # 하지만 query parameter도 지원할 수 있으므로 두 가지 방법 모두 시도
-        url = f"https://platform.ironsrc.com/levelPlay/network/instances/v4/{app_key}/"
-        
-        # Log request
-        logger.info(f"[IronSource] API Request: GET {url}")
-        masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
-        logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        
-        try:
-            response = requests.get(url, headers=headers, timeout=30)
-            
-            # Log response status
-            logger.info(f"[IronSource] Response Status: {response.status_code}")
-            
-            # Check response status before parsing
-            if response.status_code >= 400:
-                # Error response
-                try:
-                    error_body = response.json()
-                    logger.error(f"[IronSource] Error Response: {json.dumps(error_body, indent=2)}")
-                    # Handle nested JSON string in error message
-                    error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or response.text
-                    error_code = error_body.get("code") or error_body.get("errorCode") or str(response.status_code)
-                    
-                    # If error_msg is a JSON string, try to parse it
-                    if isinstance(error_msg, str) and error_msg.startswith("{") and error_msg.endswith("}"):
-                        try:
-                            parsed_error = json.loads(error_msg)
-                            error_msg = parsed_error.get("errorMessage") or parsed_error.get("message") or parsed_error.get("msg") or error_msg
-                            error_code = parsed_error.get("code") or parsed_error.get("errorCode") or error_code
-                        except:
-                            pass
-                except:
-                    error_msg = response.text or f"HTTP {response.status_code}"
-                    error_code = str(response.status_code)
-                    logger.error(f"[IronSource] Error Response (text): {error_msg}")
-                
-                return {
-                    "status": 1,
-                    "code": error_code,
-                    "msg": error_msg
-                }
-            
-            # Success response
-            response_text = response.text.strip()
-            if not response_text:
-                logger.warning(f"[IronSource] Empty response body (status {response.status_code})")
-                return {
-                    "status": 0,
-                    "code": 0,
-                    "msg": "Success (empty response)",
-                    "result": []
-                }
-            
-            try:
-                result = response.json()
-                # Log response
-                logger.info(f"[IronSource] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
-                
-                # Normalize response - should be a list
-                instances = result if isinstance(result, list) else result.get("instances", result.get("data", result.get("list", [])))
-                if not isinstance(instances, list):
-                    instances = []
-                
-            except json.JSONDecodeError as e:
-                # Invalid JSON response
-                logger.error(f"[IronSource] JSON decode error: {str(e)}")
-                logger.error(f"[IronSource] Response text: {response_text[:500]}")
-                return {
-                    "status": 1,
-                    "code": "JSON_ERROR",
-                    "msg": f"Invalid JSON response: {str(e)}. Response: {response_text[:200]}"
-                }
-            
-            return {
-                "status": 0,
-                "code": 0,
-                "msg": "Success",
-                "result": instances
-            }
-        except requests.exceptions.RequestException as e:
-            logger.error(f"[IronSource] API Error (Get Instances): {str(e)}")
-            error_msg = str(e)
-            error_code = "API_ERROR"
-            
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_body = e.response.json()
-                    logger.error(f"[IronSource] Error Response: {json.dumps(error_body, indent=2)}")
-                    error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or error_msg
-                    error_code = error_body.get("code") or error_body.get("errorCode") or error_code
-                except:
-                    logger.error(f"[IronSource] Error Response (text): {e.response.text}")
-                    if e.response.text:
-                        error_msg = e.response.text
-            
-            return {
-                "status": 1,
-                "code": error_code,
-                "msg": error_msg
-            }
-        except Exception as e:
-            # Catch any other unexpected errors
-            logger.error(f"[IronSource] Unexpected Error (Get Instances): {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {
-                "status": 1,
-                "code": "UNEXPECTED_ERROR",
-                "msg": str(e)
-            }
     
     def _generate_bigoads_sign(self, developer_id: str, token: str) -> tuple[str, str]:
         """Generate BigOAds API signature
@@ -1161,8 +755,8 @@ class MockNetworkManager:
         url = "https://dev.mintegral.com/app/open_api_create"
         
         # Mintegral API 인증: SKEY와 SECRET 필요
-        skey = _get_env_var("MINTEGRAL_SKEY")
-        secret = _get_env_var("MINTEGRAL_SECRET")
+        skey = get_env_var("MINTEGRAL_SKEY")
+        secret = get_env_var("MINTEGRAL_SECRET")
         
         if not skey or not secret:
             return {
@@ -1209,8 +803,8 @@ class MockNetworkManager:
         
         # Also log via logger
         logger.info(f"[Mintegral] API Request: POST {url}")
-        logger.info(f"[Mintegral] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Mintegral] Request Body: {json.dumps(_mask_sensitive_data(request_params), indent=2)}")
+        logger.info(f"[Mintegral] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Mintegral] Request Body: {json.dumps(mask_sensitive_data(request_params), indent=2)}")
         
         try:
             # Use form-urlencoded (matching Media List API pattern)
@@ -1231,7 +825,7 @@ class MockNetworkManager:
             
             # Also log via logger
             logger.info(f"[Mintegral] Response Status: {response.status_code}")
-            logger.info(f"[Mintegral] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+            logger.info(f"[Mintegral] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             
             # Mintegral API response format:
             # Success: {"code": 0, "msg": "Success", ...}
@@ -1305,8 +899,8 @@ class MockNetworkManager:
         url = "https://dev.mintegral.com/v2/app/open_api_list"
         
         # Mintegral API 인증: SKEY와 SECRET 필요
-        skey = _get_env_var("MINTEGRAL_SKEY")
-        secret = _get_env_var("MINTEGRAL_SECRET")
+        skey = get_env_var("MINTEGRAL_SKEY")
+        secret = get_env_var("MINTEGRAL_SECRET")
         
         if not skey or not secret:
             logger.error("[Mintegral] MINTEGRAL_SKEY or MINTEGRAL_SECRET not found")
@@ -1340,7 +934,7 @@ class MockNetworkManager:
         # Also log via logger
         logger.info(f"[Mintegral] API Request: GET {url}")
         logger.info(f"[Mintegral] Request Headers: {json.dumps(headers, indent=2)}")
-        logger.info(f"[Mintegral] Request Params: {json.dumps(_mask_sensitive_data(request_params), indent=2)}")
+        logger.info(f"[Mintegral] Request Params: {json.dumps(mask_sensitive_data(request_params), indent=2)}")
         
         try:
             # GET request with params (as per reference code)
@@ -1355,7 +949,7 @@ class MockNetworkManager:
             
             # Print to console
             print(f"[Mintegral] Response Body: {json.dumps(result, indent=2, ensure_ascii=False)}", file=sys.stderr)
-            logger.info(f"[Mintegral] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+            logger.info(f"[Mintegral] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             
             # Check response code (reference code: code == 200 means success)
             response_code = result.get("code")
@@ -1439,8 +1033,8 @@ class MockNetworkManager:
         url = "https://dev.mintegral.com/v2/placement/open_api_create"
         
         # Mintegral API 인증: skey, timestamp, sign
-        skey = _get_env_var("MINTEGRAL_SKEY")
-        secret = _get_env_var("MINTEGRAL_SECRET")
+        skey = get_env_var("MINTEGRAL_SKEY")
+        secret = get_env_var("MINTEGRAL_SECRET")
         
         if not skey or not secret:
             return {
@@ -1467,8 +1061,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Mintegral] API Request: POST {url}")
-        logger.info(f"[Mintegral] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Mintegral] Request Body: {json.dumps(_mask_sensitive_data(api_payload), indent=2)}")
+        logger.info(f"[Mintegral] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Mintegral] Request Body: {json.dumps(mask_sensitive_data(api_payload), indent=2)}")
         
         try:
             # Use data= instead of json= for form-urlencoded
@@ -1480,7 +1074,7 @@ class MockNetworkManager:
             
             result = response.json()
             
-            logger.info(f"[Mintegral] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+            logger.info(f"[Mintegral] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             
             # Mintegral API response format normalization
             # Success: code must be 0 or 200 (positive or zero)
@@ -1556,8 +1150,8 @@ class MockNetworkManager:
         url = "https://www.bigossp.com/open/app/add"
         
         # BigOAds API 인증: developerId와 token 필요
-        developer_id = _get_env_var("BIGOADS_DEVELOPER_ID")
-        token = _get_env_var("BIGOADS_TOKEN")
+        developer_id = get_env_var("BIGOADS_DEVELOPER_ID")
+        token = get_env_var("BIGOADS_TOKEN")
         
         if not developer_id or not token:
             return {
@@ -1579,8 +1173,8 @@ class MockNetworkManager:
         cleaned_payload = {k: v for k, v in payload.items() if v is not None}
         
         logger.info(f"[BigOAds] API Request: POST {url}")
-        logger.info(f"[BigOAds] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[BigOAds] Request Payload: {json.dumps(_mask_sensitive_data(cleaned_payload), indent=2)}")
+        logger.info(f"[BigOAds] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[BigOAds] Request Payload: {json.dumps(mask_sensitive_data(cleaned_payload), indent=2)}")
         
         try:
             response = requests.post(url, json=cleaned_payload, headers=headers)
@@ -1590,7 +1184,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[BigOAds] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[BigOAds] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[BigOAds] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -1634,9 +1228,9 @@ class MockNetworkManager:
         url = "https://publisher.inmobi.com/rest/api/v2/apps"
         
         # InMobi API 인증: x-client-id, x-account-id, x-client-secret 헤더 사용
-        username = _get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
-        account_id = _get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
-        client_secret = _get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
+        username = get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
+        account_id = get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
+        client_secret = get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
         
         if not username or not account_id or not client_secret:
             return {
@@ -1658,8 +1252,8 @@ class MockNetworkManager:
         cleaned_payload = {k: v for k, v in payload.items() if v is not None and v != ""}
         
         logger.info(f"[InMobi] API Request: POST {url}")
-        logger.info(f"[InMobi] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[InMobi] Request Payload: {json.dumps(_mask_sensitive_data(cleaned_payload), indent=2)}")
+        logger.info(f"[InMobi] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[InMobi] Request Payload: {json.dumps(mask_sensitive_data(cleaned_payload), indent=2)}")
         
         try:
             response = requests.post(url, json=cleaned_payload, headers=headers, timeout=30)
@@ -1669,7 +1263,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[InMobi] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[InMobi] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[InMobi] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -1731,8 +1325,8 @@ class MockNetworkManager:
         API: POST https://console.fyber.com/api/v2/management/auth
         Payload: grant_type, client_id, client_secret
         """
-        client_id_raw = _get_env_var("DT_CLIENT_ID") or _get_env_var("FYBER_CLIENT_ID")
-        client_secret_raw = _get_env_var("DT_CLIENT_SECRET") or _get_env_var("FYBER_CLIENT_SECRET")
+        client_id_raw = get_env_var("DT_CLIENT_ID") or get_env_var("FYBER_CLIENT_ID")
+        client_secret_raw = get_env_var("DT_CLIENT_SECRET") or get_env_var("FYBER_CLIENT_SECRET")
         
         # Strip whitespace and check if empty
         client_id = client_id_raw.strip() if client_id_raw else None
@@ -1740,10 +1334,10 @@ class MockNetworkManager:
         
         # Debug logging - check all possible env var names
         logger.info(f"[Fyber] Fetching new access token...")
-        dt_client_id = _get_env_var("DT_CLIENT_ID")
-        fyber_client_id = _get_env_var("FYBER_CLIENT_ID")
-        dt_client_secret = _get_env_var("DT_CLIENT_SECRET")
-        fyber_client_secret = _get_env_var("FYBER_CLIENT_SECRET")
+        dt_client_id = get_env_var("DT_CLIENT_ID")
+        fyber_client_id = get_env_var("FYBER_CLIENT_ID")
+        dt_client_secret = get_env_var("DT_CLIENT_SECRET")
+        fyber_client_secret = get_env_var("FYBER_CLIENT_SECRET")
         
         logger.info(f"[Fyber] Environment variable check:")
         logger.info(f"[Fyber]   DT_CLIENT_ID: {'✓' if dt_client_id else '✗'} (length: {len(dt_client_id) if dt_client_id else 0})")
@@ -1775,7 +1369,7 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Fyber] Requesting new access token from: {auth_url}")
-        logger.info(f"[Fyber] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[Fyber] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         try:
             response = requests.post(auth_url, json=payload, headers=headers, timeout=30)
@@ -1833,8 +1427,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Fyber] API Request: POST {url}")
-        logger.info(f"[Fyber] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Fyber] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[Fyber] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Fyber] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -1844,7 +1438,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Fyber] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Fyber] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[Fyber] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -1896,7 +1490,7 @@ class MockNetworkManager:
         
         Authentication: Basic Authentication (KEY_ID:SECRET_KEY)
         """
-        organization_id = _get_env_var("UNITY_ORGANIZATION_ID")
+        organization_id = get_env_var("UNITY_ORGANIZATION_ID")
         if not organization_id:
             logger.error("[Unity] UNITY_ORGANIZATION_ID not found")
             return {
@@ -1906,8 +1500,8 @@ class MockNetworkManager:
             }
         
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -1929,8 +1523,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Unity] API Request: POST {url}")
-        logger.info(f"[Unity] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Unity] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[Unity] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Unity] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -1939,7 +1533,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Unity] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Unity] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[Unity] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -1994,7 +1588,7 @@ class MockNetworkManager:
             store_name: Store name ("apple" or "google")
             ad_units_payload: Payload with ad units to update (archive=true)
         """
-        organization_id = _get_env_var("UNITY_ORGANIZATION_ID")
+        organization_id = get_env_var("UNITY_ORGANIZATION_ID")
         if not organization_id:
             logger.error("[Unity] UNITY_ORGANIZATION_ID not found")
             return {
@@ -2004,8 +1598,8 @@ class MockNetworkManager:
             }
         
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -2027,8 +1621,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Unity] API Request: PATCH {url}")
-        logger.info(f"[Unity] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Unity] Request Payload: {json.dumps(_mask_sensitive_data(ad_units_payload), indent=2)}")
+        logger.info(f"[Unity] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Unity] Request Payload: {json.dumps(mask_sensitive_data(ad_units_payload), indent=2)}")
         
         try:
             response = requests.patch(url, json=ad_units_payload, headers=headers, timeout=30)
@@ -2037,7 +1631,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Unity] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Unity] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[Unity] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -2093,7 +1687,7 @@ class MockNetworkManager:
             ad_unit_id: Ad Unit ID (e.g., "iOS RV Bidding", "AOS IS Bidding")
             placements_payload: List of placement objects to create
         """
-        organization_id = _get_env_var("UNITY_ORGANIZATION_ID")
+        organization_id = get_env_var("UNITY_ORGANIZATION_ID")
         if not organization_id:
             logger.error("[Unity] UNITY_ORGANIZATION_ID not found")
             return {
@@ -2103,8 +1697,8 @@ class MockNetworkManager:
             }
         
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -2129,8 +1723,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Unity] API Request: POST {url}")
-        logger.info(f"[Unity] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Unity] Request Payload: {json.dumps(_mask_sensitive_data(placements_payload), indent=2)}")
+        logger.info(f"[Unity] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Unity] Request Payload: {json.dumps(mask_sensitive_data(placements_payload), indent=2)}")
         
         try:
             response = requests.post(url, json=placements_payload, headers=headers, timeout=30)
@@ -2139,7 +1733,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Unity] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Unity] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
                 
                 # Log detailed error information for 400 errors
                 if response.status_code == 400 and isinstance(result, dict):
@@ -2201,7 +1795,7 @@ class MockNetworkManager:
                     logger.error(f"[Unity]   → URL: {url}")
                     logger.error(f"[Unity]   → adUnitId (original): {ad_unit_id}")
                     logger.error(f"[Unity]   → adUnitId (encoded): {encoded_ad_unit_id}")
-                    logger.error(f"[Unity]   → Payload: {json.dumps(_mask_sensitive_data(placements_payload), indent=2)}")
+                    logger.error(f"[Unity]   → Payload: {json.dumps(mask_sensitive_data(placements_payload), indent=2)}")
                 
                 return {
                     "status": 1,
@@ -2232,7 +1826,7 @@ class MockNetworkManager:
             store_name: Store name ("apple" or "google")
             ad_units_payload: List of ad unit objects to create
         """
-        organization_id = _get_env_var("UNITY_ORGANIZATION_ID")
+        organization_id = get_env_var("UNITY_ORGANIZATION_ID")
         if not organization_id:
             logger.error("[Unity] UNITY_ORGANIZATION_ID not found")
             return {
@@ -2242,8 +1836,8 @@ class MockNetworkManager:
             }
         
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -2265,8 +1859,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Unity] API Request: POST {url}")
-        logger.info(f"[Unity] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Unity] Request Payload: {json.dumps(_mask_sensitive_data(ad_units_payload), indent=2)}")
+        logger.info(f"[Unity] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Unity] Request Payload: {json.dumps(mask_sensitive_data(ad_units_payload), indent=2)}")
         
         try:
             response = requests.post(url, json=ad_units_payload, headers=headers, timeout=30)
@@ -2275,7 +1869,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Unity] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Unity] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[Unity] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -2344,8 +1938,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Fyber] API Request: POST {url}")
-        logger.info(f"[Fyber] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Fyber] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[Fyber] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Fyber] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -2355,7 +1949,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[Fyber] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Fyber] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[Fyber] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -2397,8 +1991,8 @@ class MockNetworkManager:
         url = "https://www.bigossp.com/open/slot/add"
         
         # BigOAds API 인증: developerId와 token 필요
-        developer_id = _get_env_var("BIGOADS_DEVELOPER_ID")
-        token = _get_env_var("BIGOADS_TOKEN")
+        developer_id = get_env_var("BIGOADS_DEVELOPER_ID")
+        token = get_env_var("BIGOADS_TOKEN")
         
         if not developer_id or not token:
             return {
@@ -2422,7 +2016,7 @@ class MockNetworkManager:
         print(f"[BigOAds] API Request: POST {url}", file=sys.stderr)
         
         # Log headers (mask sensitive data)
-        masked_headers = _mask_sensitive_data(headers.copy())
+        masked_headers = mask_sensitive_data(headers.copy())
         print(f"[BigOAds] Request Headers: {json.dumps(masked_headers, indent=2)}", file=sys.stderr)
         
         # Log payload WITHOUT masking for debugging (no sensitive data in unit payload)
@@ -2521,9 +2115,9 @@ class MockNetworkManager:
         url = "https://publisher.inmobi.com/rest/api/v1/placements"
         
         # InMobi API 인증: x-client-id, x-account-id, x-client-secret 헤더 사용
-        username = _get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
-        account_id = _get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
-        client_secret = _get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
+        username = get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
+        account_id = get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
+        client_secret = get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
         
         if not username or not account_id or not client_secret:
             return {
@@ -2542,8 +2136,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[InMobi] API Request: POST {url}")
-        logger.info(f"[InMobi] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[InMobi] Request Payload: {json.dumps(_mask_sensitive_data(payload), indent=2)}")
+        logger.info(f"[InMobi] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[InMobi] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
         
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -2553,7 +2147,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[InMobi] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[InMobi] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[InMobi] Response Text: {response.text}")
                 result = {"code": response.status_code, "msg": response.text}
@@ -2601,7 +2195,7 @@ class MockNetworkManager:
         Returns:
             API response dict
         """
-        api_key = _get_env_var("APPLOVIN_API_KEY")
+        api_key = get_env_var("APPLOVIN_API_KEY")
         
         if not api_key:
             return {
@@ -2619,7 +2213,7 @@ class MockNetworkManager:
         }
         
         logger.info(f"[AppLovin] API Request: POST {url}")
-        logger.info(f"[AppLovin] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[AppLovin] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
         logger.info(f"[AppLovin] Request Payload: {json.dumps(payload, indent=2)}")
         
         try:
@@ -2682,7 +2276,7 @@ class MockNetworkManager:
     
     def _create_pangle_unit(self, payload: Dict) -> Dict:
         """Create ad placement (unit) via Pangle API"""
-        security_key = _get_env_var("PANGLE_SECURITY_KEY")
+        security_key = get_env_var("PANGLE_SECURITY_KEY")
         
         if not security_key:
             return {
@@ -2692,8 +2286,8 @@ class MockNetworkManager:
             }
         
         # Get user_id and role_id from .env
-        user_id = _get_env_var("PANGLE_USER_ID")
-        role_id = _get_env_var("PANGLE_ROLE_ID")
+        user_id = get_env_var("PANGLE_USER_ID")
+        role_id = get_env_var("PANGLE_ROLE_ID")
         
         if not user_id or not role_id:
             return {
@@ -2747,8 +2341,8 @@ class MockNetworkManager:
         }
         
         logger.info(f"[Pangle] API Request: POST {url}")
-        logger.info(f"[Pangle] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
-        logger.info(f"[Pangle] Request Params: {json.dumps(_mask_sensitive_data(request_params), indent=2)}")
+        logger.info(f"[Pangle] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[Pangle] Request Params: {json.dumps(mask_sensitive_data(request_params), indent=2)}")
         
         try:
             response = requests.post(url, json=request_params, headers=headers)
@@ -2759,7 +2353,7 @@ class MockNetworkManager:
             
             result = response.json()
             
-            logger.info(f"[Pangle] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+            logger.info(f"[Pangle] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             
             # Pangle API response format may vary, normalize it
             if result.get("code") == 0 or result.get("ret_code") == 0:
@@ -2821,8 +2415,8 @@ class MockNetworkManager:
         url = "https://www.bigossp.com/open/app/list"
         
         # BigOAds API 인증: developerId와 token 필요
-        developer_id = _get_env_var("BIGOADS_DEVELOPER_ID")
-        token = _get_env_var("BIGOADS_TOKEN")
+        developer_id = get_env_var("BIGOADS_DEVELOPER_ID")
+        token = get_env_var("BIGOADS_TOKEN")
         
         if not developer_id or not token:
             logger.error("[BigOAds] BIGOADS_DEVELOPER_ID and BIGOADS_TOKEN must be set")
@@ -2844,7 +2438,7 @@ class MockNetworkManager:
         }
         
         logger.info(f"[BigOAds] API Request: POST {url}")
-        logger.info(f"[BigOAds] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[BigOAds] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
         logger.info(f"[BigOAds] Request Payload: {json.dumps(payload, indent=2)}")
         
         try:
@@ -2854,7 +2448,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[BigOAds] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[BigOAds] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[BigOAds] Response Text: {response.text}")
                 return []
@@ -2921,9 +2515,9 @@ class MockNetworkManager:
         url = "https://publisher.inmobi.com/rest/api/v2/apps"
         
         # InMobi API 인증: x-client-id, x-account-id, x-client-secret 헤더 사용
-        username = _get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
-        account_id = _get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
-        client_secret = _get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
+        username = get_env_var("INMOBI_USERNAME")  # x-client-id (email ID)
+        account_id = get_env_var("INMOBI_ACCOUNT_ID")  # x-account-id (Account ID)
+        client_secret = get_env_var("INMOBI_CLIENT_SECRET")  # x-client-secret (API key)
         
         if not username or not account_id or not client_secret:
             logger.error("[InMobi] INMOBI_USERNAME, INMOBI_ACCOUNT_ID, and INMOBI_CLIENT_SECRET must be set")
@@ -2945,7 +2539,7 @@ class MockNetworkManager:
         }
         
         logger.info(f"[InMobi] API Request: GET {url}")
-        logger.info(f"[InMobi] Request Headers: {json.dumps(_mask_sensitive_data(headers), indent=2)}")
+        logger.info(f"[InMobi] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
         logger.info(f"[InMobi] Request Params: {json.dumps(params, indent=2)}")
         
         try:
@@ -2955,7 +2549,7 @@ class MockNetworkManager:
             
             try:
                 result = response.json()
-                logger.info(f"[InMobi] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[InMobi] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except:
                 logger.error(f"[InMobi] Response Text: {response.text}")
                 return []
@@ -3037,8 +2631,8 @@ class MockNetworkManager:
         
         # Get publisher_id or app_id from environment if not provided
         if not publisher_id and not app_id:
-            publisher_id_str = _get_env_var("FYBER_PUBLISHER_ID") or _get_env_var("DT_PUBLISHER_ID")
-            app_id_str = _get_env_var("FYBER_APP_ID") or _get_env_var("DT_APP_ID")
+            publisher_id_str = get_env_var("FYBER_PUBLISHER_ID") or get_env_var("DT_PUBLISHER_ID")
+            app_id_str = get_env_var("FYBER_APP_ID") or get_env_var("DT_APP_ID")
             
             if app_id_str:
                 try:
@@ -3077,7 +2671,7 @@ class MockNetworkManager:
             
             if response.status_code == 200:
                 result = response.json()
-                logger.info(f"[Fyber] Response Body: {json.dumps(_mask_sensitive_data(result), indent=2)}")
+                logger.info(f"[Fyber] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
                 
                 # Parse response - can be list or dict
                 apps = []
@@ -3152,13 +2746,13 @@ class MockNetworkManager:
             JWT Token string or None
         """
         # Check for existing JWT token in environment
-        jwt_token = _get_env_var("LIFTOFF_JWT_TOKEN") or _get_env_var("VUNGLE_JWT_TOKEN")
+        jwt_token = get_env_var("LIFTOFF_JWT_TOKEN") or get_env_var("VUNGLE_JWT_TOKEN")
         if jwt_token:
             logger.info("[Vungle] Using existing JWT token from environment")
             return jwt_token
         
         # Get secret token
-        secret_token = _get_env_var("LIFTOFF_SECRET_TOKEN") or _get_env_var("VUNGLE_SECRET_TOKEN")
+        secret_token = get_env_var("LIFTOFF_SECRET_TOKEN") or get_env_var("VUNGLE_SECRET_TOKEN")
         if not secret_token:
             logger.error("[Vungle] LIFTOFF_SECRET_TOKEN or VUNGLE_SECRET_TOKEN not found")
             return None
@@ -3258,14 +2852,14 @@ class MockNetworkManager:
         Returns:
             List of project dicts
         """
-        organization_id = _get_env_var("UNITY_ORGANIZATION_ID")
+        organization_id = get_env_var("UNITY_ORGANIZATION_ID")
         if not organization_id:
             logger.error("[Unity] UNITY_ORGANIZATION_ID not found")
             return []
         
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -3343,8 +2937,8 @@ class MockNetworkManager:
             Dict with "apple" and "google" keys containing ad units
         """
         # Get Unity API credentials for Basic Auth
-        key_id = _get_env_var("UNITY_KEY_ID")
-        secret_key = _get_env_var("UNITY_SECRET_KEY")
+        key_id = get_env_var("UNITY_KEY_ID")
+        secret_key = get_env_var("UNITY_SECRET_KEY")
         
         if not key_id or not secret_key:
             logger.error("[Unity] UNITY_KEY_ID or UNITY_SECRET_KEY not found")
@@ -3494,69 +3088,4 @@ def get_network_manager():
         # For now, use mock
         _network_manager = MockNetworkManager()
     return _network_manager
-
-
-def handle_api_response(response: Dict) -> Optional[Dict]:
-    """Handle API response and display result"""
-    import sys
-    
-    # Log full response to console
-    logger.info(f"API Response: {json.dumps(_mask_sensitive_data(response), indent=2)}")
-    print(f"[API Response] {json.dumps(_mask_sensitive_data(response), indent=2)}", file=sys.stderr)
-    
-    if response.get('status') == 0 or response.get('code') == 0:
-        st.success("✅ Success!")
-        
-        # Display full response in expander
-        with st.expander("📥 Full API Response", expanded=False):
-            st.json(_mask_sensitive_data(response))
-        
-        result = response.get('result', {})
-        if result:
-            # Display result separately for clarity
-            st.subheader("📝 Result Data")
-            st.json(_mask_sensitive_data(result))
-        
-        return result
-    else:
-        error_msg = response.get('msg', 'Unknown error')
-        error_code = response.get('code', 'N/A')
-        
-        # Parse and improve error messages for better user experience
-        user_friendly_msg = error_msg
-        if error_code == "105" or error_code == 105:
-            if "app auditing" in error_msg.lower() or "app audit" in error_msg.lower():
-                if "audit fail" in error_msg.lower():
-                    user_friendly_msg = "⚠️ App audit failed. Please ensure your app has passed the audit before creating slots."
-                else:
-                    user_friendly_msg = "⏳ App is currently under audit. Please wait for the audit to complete before creating slots."
-            else:
-                user_friendly_msg = f"System error: {error_msg}"
-        
-        # Log error to console
-        logger.error(f"API Error: {error_code} - {error_msg}")
-        print(f"[API Error] {error_code} - {error_msg}", file=sys.stderr)
-        
-        st.error(f"❌ Error: {error_code} - {user_friendly_msg}")
-        
-        # Show original error message in expander for debugging
-        with st.expander("📥 Full Error Response", expanded=True):
-            st.json(_mask_sensitive_data(response))
-            st.info(f"**Original error message:** {error_msg}")
-            
-            # Show validation errors if available
-            if response.get("errors"):
-                st.subheader("❌ Validation Errors")
-                st.json(response.get("errors"))
-            if response.get("errorDetails"):
-                st.subheader("❌ Error Details")
-                st.json(response.get("errorDetails"))
-            if response.get("validationErrors"):
-                st.subheader("❌ Validation Errors")
-                st.json(response.get("validationErrors"))
-            if response.get("fieldErrors"):
-                st.subheader("❌ Field Errors")
-                st.json(response.get("fieldErrors"))
-        
-        return None
 

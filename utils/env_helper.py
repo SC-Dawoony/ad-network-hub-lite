@@ -1,26 +1,19 @@
-"""Helper function to get environment variables from Streamlit secrets or .env file"""
-import os
-from typing import Optional
+"""Helper function to get environment variables from Streamlit secrets or .env file
 
-def get_env_var(key: str, default: Optional[str] = None) -> Optional[str]:
-    """
-    Get environment variable from Streamlit secrets (if available) or .env file
-    
-    Args:
-        key: Environment variable key
-        default: Default value if not found
-        
-    Returns:
-        Environment variable value or default
-    """
-    try:
-        import streamlit as st
-        # Try Streamlit secrets first (for Streamlit Cloud)
-        if hasattr(st, 'secrets') and st.secrets and key in st.secrets:
-            return st.secrets[key]
-    except:
-        pass
-    
-    # Fallback to environment variables (from .env file or system env)
-    return os.getenv(key, default)
+DEPRECATED: Use utils.helpers.get_env_var instead
+This file is kept for backward compatibility only and will be removed in future versions.
+"""
+import warnings
+from utils.helpers import get_env_var as _get_env_var
 
+def get_env_var(key: str, default=None):
+    """Get environment variable (DEPRECATED - use utils.helpers.get_env_var)
+    
+    This is a compatibility wrapper. New code should use utils.helpers.get_env_var directly.
+    """
+    warnings.warn(
+        "utils.env_helper.get_env_var is deprecated. Use utils.helpers.get_env_var instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return _get_env_var(key, default)

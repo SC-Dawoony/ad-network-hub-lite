@@ -286,7 +286,7 @@ def create_default_slot(network: str, app_info: dict, slot_type: str, network_ma
     """Create a default slot with predefined settings"""
     import streamlit as st
     import logging
-    from utils.network_manager import handle_api_response
+    from utils.ui_helpers import handle_api_response
     from utils.session_manager import SessionManager
     
     logger = logging.getLogger(__name__)

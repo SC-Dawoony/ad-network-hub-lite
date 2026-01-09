@@ -5,7 +5,8 @@ import json
 import time
 import base64
 import logging
-from .base_auth import BaseAuth, _get_env_var
+from .base_auth import BaseAuth
+from utils.helpers import get_env_var
 
 logger = logging.getLogger(__name__)
 

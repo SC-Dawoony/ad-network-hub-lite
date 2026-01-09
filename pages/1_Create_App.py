@@ -4,7 +4,9 @@ import logging
 import json
 from utils.session_manager import SessionManager
 from utils.ui_components import DynamicFormRenderer
-from utils.network_manager import get_network_manager, handle_api_response, _mask_sensitive_data
+from utils.network_manager import get_network_manager
+from utils.ui_helpers import handle_api_response
+from utils.helpers import mask_sensitive_data
 from utils.validators import validate_app_name, validate_package_name, validate_url, validate_slot_name
 from network_configs import get_network_config, get_network_display_names
 from components.unity_update_ad_units import render_unity_update_ad_units
@@ -22,14 +24,6 @@ from components.create_app_helpers import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Alias for backward compatibility (to avoid breaking existing code)
-_extract_package_name_from_store_url = extract_package_name_from_store_url
-_normalize_platform_str = normalize_platform_str
-_get_bigoads_pkg_name_display = get_bigoads_pkg_name_display
-_generate_slot_name = generate_slot_name
-_create_default_slot = create_default_slot
-
 
 # Page configuration
 st.set_page_config(

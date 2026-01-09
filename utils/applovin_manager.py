@@ -4,14 +4,14 @@ import requests
 import json
 import logging
 import pandas as pd
-from utils.network_manager import _get_env_var
+from utils.helpers import get_env_var
 
 logger = logging.getLogger(__name__)
 
 
 def get_applovin_api_key() -> Optional[str]:
     """Get AppLovin API Key from environment variables"""
-    return _get_env_var("APPLOVIN_API_KEY")
+    return get_env_var("APPLOVIN_API_KEY")
 
 
 def transform_csv_data_to_api_format(csv_data: List[Dict]) -> Dict:
