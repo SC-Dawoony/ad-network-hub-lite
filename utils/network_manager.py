@@ -23,6 +23,9 @@ class MockNetworkManager:
         # Initialize network API instances
         self._ironsource_api = None
         self._bigoads_api = None
+        self._mintegral_api = None
+        self._inmobi_api = None
+        self._fyber_api = None
     
     def get_client(self, network: str):
         """Get API client for a network"""
@@ -41,11 +44,23 @@ class MockNetworkManager:
                 self._bigoads_api = BigOAdsAPI()
             return self._bigoads_api.create_app(payload)
         elif network == "mintegral":
-            return self._create_mintegral_app(payload)
+            # Use new MintegralAPI
+            if self._mintegral_api is None:
+                from utils.network_apis.mintegral_api import MintegralAPI
+                self._mintegral_api = MintegralAPI()
+            return self._mintegral_api.create_app(payload)
         elif network == "inmobi":
-            return self._create_inmobi_app(payload)
+            # Use new InMobiAPI
+            if self._inmobi_api is None:
+                from utils.network_apis.inmobi_api import InMobiAPI
+                self._inmobi_api = InMobiAPI()
+            return self._inmobi_api.create_app(payload)
         elif network == "fyber":
-            return self._create_fyber_app(payload)
+            # Use new FyberAPI
+            if self._fyber_api is None:
+                from utils.network_apis.fyber_api import FyberAPI
+                self._fyber_api = FyberAPI()
+            return self._fyber_api.create_app(payload)
         elif network == "unity":
             return self._create_unity_project(payload)
         
@@ -640,11 +655,23 @@ class MockNetworkManager:
         elif network == "pangle":
             return self._create_pangle_unit(payload)
         elif network == "mintegral":
-            return self._create_mintegral_unit(payload)
+            # Use new MintegralAPI
+            if self._mintegral_api is None:
+                from utils.network_apis.mintegral_api import MintegralAPI
+                self._mintegral_api = MintegralAPI()
+            return self._mintegral_api.create_unit(payload, app_key=app_key)
         elif network == "inmobi":
-            return self._create_inmobi_unit(payload)
+            # Use new InMobiAPI
+            if self._inmobi_api is None:
+                from utils.network_apis.inmobi_api import InMobiAPI
+                self._inmobi_api = InMobiAPI()
+            return self._inmobi_api.create_unit(payload, app_key=app_key)
         elif network == "fyber":
-            return self._create_fyber_unit(payload)
+            # Use new FyberAPI
+            if self._fyber_api is None:
+                from utils.network_apis.fyber_api import FyberAPI
+                self._fyber_api = FyberAPI()
+            return self._fyber_api.create_unit(payload, app_key=app_key)
         elif network == "applovin":
             return self._create_applovin_unit(payload)
         
@@ -3016,25 +3043,23 @@ class MockNetworkManager:
                 self._ironsource_api = IronSourceAPI()
             return self._ironsource_api.get_apps(app_key=app_key)
         elif network == "mintegral":
-            return self._get_mintegral_apps()
+            # Use new MintegralAPI
+            if self._mintegral_api is None:
+                from utils.network_apis.mintegral_api import MintegralAPI
+                self._mintegral_api = MintegralAPI()
+            return self._mintegral_api.get_apps(app_key=app_key)
         elif network == "inmobi":
-            return self._get_inmobi_apps()
+            # Use new InMobiAPI
+            if self._inmobi_api is None:
+                from utils.network_apis.inmobi_api import InMobiAPI
+                self._inmobi_api = InMobiAPI()
+            return self._inmobi_api.get_apps(app_key=app_key)
         elif network == "fyber":
-            # For Fyber, app_key can be publisher_id or app_id
-            # If it's a numeric value, try app_id first, then publisher_id
-            publisher_id = None
-            app_id = None
-            if app_key:
-                try:
-                    if app_key.startswith("app:"):
-                        app_id = int(app_key.split(":")[1])
-                    else:
-                        # Try as app_id first (more specific)
-                        numeric_value = int(app_key)
-                        app_id = numeric_value
-                except ValueError:
-                    logger.warning(f"[Fyber] Invalid app_key format: {app_key}")
-            return self._get_fyber_apps(publisher_id=publisher_id, app_id=app_id)
+            # Use new FyberAPI
+            if self._fyber_api is None:
+                from utils.network_apis.fyber_api import FyberAPI
+                self._fyber_api = FyberAPI()
+            return self._fyber_api.get_apps(app_key=app_key)
         elif network == "vungle":
             # For Vungle, placements contain both app and unit info
             # Extract unique apps from placements
