@@ -1372,92 +1372,18 @@ class MockNetworkManager:
             }
     
     def _get_fyber_access_token(self) -> Optional[str]:
-        """Get Fyber (DT) Access Token
+        """Get Fyber (DT) Access Token (wrapper for compatibility)
         
-        Always fetches a new access token using DT_CLIENT_ID and DT_CLIENT_SECRET.
-        API: POST https://console.fyber.com/api/v2/management/auth
-        Payload: grant_type, client_id, client_secret
+        Note: This is a wrapper method for backward compatibility.
+        New code should use FyberAPI.get_access_token() directly.
+        
+        Returns:
+            Access token string or None if failed
         """
-        client_id_raw = get_env_var("DT_CLIENT_ID") or get_env_var("FYBER_CLIENT_ID")
-        client_secret_raw = get_env_var("DT_CLIENT_SECRET") or get_env_var("FYBER_CLIENT_SECRET")
-        
-        # Strip whitespace and check if empty
-        client_id = client_id_raw.strip() if client_id_raw else None
-        client_secret = client_secret_raw.strip() if client_secret_raw else None
-        
-        # Debug logging - check all possible env var names
-        logger.info(f"[Fyber] Fetching new access token...")
-        dt_client_id = get_env_var("DT_CLIENT_ID")
-        fyber_client_id = get_env_var("FYBER_CLIENT_ID")
-        dt_client_secret = get_env_var("DT_CLIENT_SECRET")
-        fyber_client_secret = get_env_var("FYBER_CLIENT_SECRET")
-        
-        logger.info(f"[Fyber] Environment variable check:")
-        logger.info(f"[Fyber]   DT_CLIENT_ID: {'✓' if dt_client_id else '✗'} (length: {len(dt_client_id) if dt_client_id else 0})")
-        logger.info(f"[Fyber]   FYBER_CLIENT_ID: {'✓' if fyber_client_id else '✗'} (length: {len(fyber_client_id) if fyber_client_id else 0})")
-        logger.info(f"[Fyber]   DT_CLIENT_SECRET: {'✓' if dt_client_secret else '✗'} (length: {len(dt_client_secret) if dt_client_secret else 0})")
-        logger.info(f"[Fyber]   FYBER_CLIENT_SECRET: {'✓' if fyber_client_secret else '✗'} (length: {len(fyber_client_secret) if fyber_client_secret else 0})")
-        logger.info(f"[Fyber] Final client_id: {'✓' if client_id else '✗'} (length: {len(client_id) if client_id else 0})")
-        logger.info(f"[Fyber] Final client_secret: {'✓' if client_secret else '✗'} (length: {len(client_secret) if client_secret else 0})")
-        
-        if not client_id or not client_secret:
-            logger.error("[Fyber] DT_CLIENT_ID and DT_CLIENT_SECRET must be set")
-            logger.error(f"[Fyber] client_id is None or empty: {not client_id}, client_secret is None or empty: {not client_secret}")
-            logger.error(f"[Fyber] Please check:")
-            logger.error(f"[Fyber]   1. .env file has DT_CLIENT_ID and DT_CLIENT_SECRET (or FYBER_CLIENT_ID and FYBER_CLIENT_SECRET)")
-            logger.error(f"[Fyber]   2. Streamlit secrets has DT_CLIENT_ID and DT_CLIENT_SECRET")
-            logger.error(f"[Fyber]   3. Values are not empty or whitespace-only")
-            return None
-        
-        auth_url = "https://console.fyber.com/api/v2/management/auth"
-        
-        payload = {
-            "grant_type": "management_client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-        }
-        
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        logger.info(f"[Fyber] Requesting new access token from: {auth_url}")
-        logger.info(f"[Fyber] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
-        
-        try:
-            response = requests.post(auth_url, json=payload, headers=headers, timeout=30)
-            
-            logger.info(f"[Fyber] Response Status: {response.status_code}")
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Check both accessToken and access_token (API may return either)
-                access_token = result.get("accessToken") or result.get("access_token")
-                if access_token:
-                    logger.info(f"[Fyber] ✅ Successfully obtained new access token (length: {len(access_token)})")
-                    return access_token
-                else:
-                    logger.error(f"[Fyber] ❌ Access token not found in response: {result}")
-                    return None
-            else:
-                logger.error(f"[Fyber] ❌ Failed to get access token. Status: {response.status_code}")
-                logger.error(f"[Fyber] Response: {response.text}")
-                
-                # Provide helpful error messages
-                if "invalid_client" in response.text:
-                    logger.error("[Fyber] 💡 'invalid_client' 오류:")
-                    logger.error("[Fyber]   → Client ID 또는 Client Secret이 올바르지 않습니다.")
-                    logger.error("[Fyber]   → Fyber Console > Settings > API Credentials > Management API")
-                    logger.error("[Fyber]   → UI에서 받은 Client ID와 Client Secret을 정확히 복사했는지 확인")
-                elif "invalid_request" in response.text:
-                    logger.error("[Fyber] 💡 'invalid_request' 오류:")
-                    logger.error("[Fyber]   → 요청 파라미터가 올바르지 않습니다.")
-                    logger.error("[Fyber]   → grant_type이 'management_client_credentials'인지 확인")
-                
-                return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"[Fyber] ❌ API Error (Get Access Token): {str(e)}")
-            return None
+        if self._fyber_api is None:
+            from utils.network_apis.fyber_api import FyberAPI
+            self._fyber_api = FyberAPI()
+        return self._fyber_api.get_access_token()
     
     def _create_fyber_app(self, payload: Dict) -> Dict:
         """Create app via Fyber (DT) API"""

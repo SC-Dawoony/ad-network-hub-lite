@@ -84,6 +84,14 @@ class FyberAPI(BaseNetworkAPI):
             self.logger.error(f"[Fyber] ❌ API Error (Get Access Token): {str(e)}")
             return None
     
+    def get_access_token(self) -> Optional[str]:
+        """Get Fyber (DT) Access Token (public method)
+        
+        Returns:
+            Access token string or None if failed
+        """
+        return self._get_access_token()
+
     def _get_headers(self) -> Optional[Dict[str, str]]:
         """Get Fyber API headers with Bearer token"""
         access_token = self._get_access_token()
