@@ -22,6 +22,7 @@ class MockNetworkManager:
         self.clients = {}
         # Initialize network API instances
         self._ironsource_api = None
+        self._bigoads_api = None
     
     def get_client(self, network: str):
         """Get API client for a network"""
@@ -34,7 +35,11 @@ class MockNetworkManager:
         elif network == "pangle":
             return self._create_pangle_app(payload)
         elif network == "bigoads":
-            return self._create_bigoads_app(payload)
+            # Use new BigOAdsAPI
+            if self._bigoads_api is None:
+                from utils.network_apis.bigoads_api import BigOAdsAPI
+                self._bigoads_api = BigOAdsAPI()
+            return self._bigoads_api.create_app(payload)
         elif network == "mintegral":
             return self._create_mintegral_app(payload)
         elif network == "inmobi":
@@ -627,7 +632,11 @@ class MockNetworkManager:
                 self._ironsource_api = IronSourceAPI()
             return self._ironsource_api.create_unit(payload, app_key=app_key)
         elif network == "bigoads":
-            return self._create_bigoads_unit(payload)
+            # Use new BigOAdsAPI
+            if self._bigoads_api is None:
+                from utils.network_apis.bigoads_api import BigOAdsAPI
+                self._bigoads_api = BigOAdsAPI()
+            return self._bigoads_api.create_unit(payload, app_key=app_key)
         elif network == "pangle":
             return self._create_pangle_unit(payload)
         elif network == "mintegral":
@@ -2995,7 +3004,11 @@ class MockNetworkManager:
             app_key: Optional app key to filter by (for IronSource)
         """
         if network == "bigoads":
-            return self._get_bigoads_apps()
+            # Use new BigOAdsAPI
+            if self._bigoads_api is None:
+                from utils.network_apis.bigoads_api import BigOAdsAPI
+                self._bigoads_api = BigOAdsAPI()
+            return self._bigoads_api.get_apps(app_key=app_key)
         elif network == "ironsource":
             # Use new IronSourceAPI
             if self._ironsource_api is None:
