@@ -6,5 +6,7 @@ from .bigoads_api import BigOAdsAPI
 from .mintegral_api import MintegralAPI
 from .inmobi_api import InMobiAPI
 from .fyber_api import FyberAPI
+from .applovin_api import AppLovinAPI
+from .unity_api import UnityAPI
 
-__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI']
+__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI', 'AppLovinAPI', 'UnityAPI']
