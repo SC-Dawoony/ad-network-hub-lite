@@ -88,11 +88,12 @@ def map_store_info_to_network_params(
     
     elif network == "pangle":
         params["app_name"] = app_name or ""
-        # Pangle uses download_url (single field)
+        # Pangle uses download_url (single field per platform)
+        # Store both platform URLs for multi-platform support
         if ios_info:
-            params["download_url"] = f"https://apps.apple.com/us/app/id{ios_info.get('app_id')}"
-        elif android_info:
-            params["download_url"] = f"https://play.google.com/store/apps/details?id={android_info.get('package_name')}"
+            params["iosDownloadUrl"] = f"https://apps.apple.com/us/app/id{ios_info.get('app_id')}"
+        if android_info:
+            params["androidDownloadUrl"] = f"https://play.google.com/store/apps/details?id={android_info.get('package_name')}"
         # Default category (user may need to adjust)
         params["app_category_code"] = 121344  # Games-Others (default)
         params["coppa_value"] = 0  # Default: For users aged 13 and above
@@ -250,19 +251,15 @@ def render_new_create_app_ui():
             if priority_key in all_networks:
                 sorted_networks.append((priority_key, all_networks[priority_key]))
         
-        # Add remaining networks in alphabetical order (excluding priority and pangle)
+        # Add remaining networks in alphabetical order (excluding priority)
         remaining_networks = []
         for network_key, network_display in all_networks.items():
-            if network_key not in priority_networks and network_key != "pangle":
+            if network_key not in priority_networks:
                 remaining_networks.append((network_key, network_display))
         
         # Sort remaining networks alphabetically by display name
         remaining_networks.sort(key=lambda x: x[1])
         sorted_networks.extend(remaining_networks)
-        
-        # Add Pangle last
-        if "pangle" in all_networks:
-            sorted_networks.append(("pangle", all_networks["pangle"]))
         
         # Convert to ordered dict
         available_networks = dict(sorted_networks)
@@ -271,8 +268,8 @@ def render_new_create_app_ui():
         button_cols = st.columns([1, 1, 4])
         with button_cols[0]:
             if st.button("✅ 모두 선택", key="select_all_networks", use_container_width=True):
-                # Select all networks except disabled ones (pangle)
-                enabled_networks = [key for key in available_networks.keys() if key != "pangle"]
+                # Select all networks
+                enabled_networks = list(available_networks.keys())
                 st.session_state.selected_networks = enabled_networks
                 # Update individual checkbox states
                 for network_key in enabled_networks:
@@ -293,37 +290,35 @@ def render_new_create_app_ui():
         
         for idx, (network_key, network_display) in enumerate(available_networks.items()):
             with network_cols[idx % 3]:
-                # Disable Pangle (TikTok) checkbox
-                is_disabled = network_key == "pangle"
-                
-                # Add info icon with tooltip for disabled networks
+                # No disabled networks
+                is_disabled = False
                 display_label = network_display
                 help_text = None
-                if is_disabled:
-                    help_text = "⚠️ 현재 비활성화됨"
                 
                 # Initialize checkbox state if not exists
                 checkbox_key = f"network_checkbox_{network_key}"
                 if checkbox_key not in st.session_state:
-                    st.session_state[checkbox_key] = network_key in st.session_state.selected_networks if not is_disabled else False
+                    st.session_state[checkbox_key] = network_key in st.session_state.selected_networks
                 
                 # Get checkbox value from session state
-                checkbox_value = st.session_state[checkbox_key] if not is_disabled else False
+                checkbox_value = st.session_state[checkbox_key]
                 
-                if st.checkbox(
+                # Create checkbox (will update session state automatically)
+                is_checked = st.checkbox(
                     display_label,
                     key=checkbox_key,
                     value=checkbox_value,
-                    disabled=is_disabled,
                     help=help_text
-                ):
-                    if network_key not in selected_networks and not is_disabled:
+                )
+
+                # Update selected_networks list based on checkbox state
+                if is_checked:
+                    if network_key not in selected_networks:
                         selected_networks.append(network_key)
-                elif not is_disabled:
+                elif network_key in selected_networks:
                     # If unchecked, remove from selected_networks
-                    if network_key in selected_networks:
-                        selected_networks.remove(network_key)
-        
+                    selected_networks.remove(network_key)
+    
         st.session_state.selected_networks = selected_networks
         
         if not selected_networks:
@@ -369,7 +364,7 @@ def render_new_create_app_ui():
                 payloads = {}
                 
                 # Handle networks that support both iOS and Android
-                if network_key in ["ironsource", "inmobi", "bigoads", "fyber"]:
+                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "pangle"]:
                     if st.session_state.store_info_android:
                         try:
                             android_payload = config.build_app_payload(mapped_params, platform="Android")
@@ -573,7 +568,7 @@ def render_new_create_app_ui():
                         network_manager = get_network_manager()
                         
                         # Handle networks that support both iOS and Android
-                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral"]:
+                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"]:
                             results = []
                             
                             # Android
@@ -678,6 +673,13 @@ def render_new_create_app_ui():
                                     _process_fyber_create_app_results(
                                         network_key, network_display, mapped_params, results
                                     )
+                                elif network_key == "pangle":
+                                    # Pangle: process each platform separately (similar to Mintegral)
+                                    for platform, result, response in results:
+                                        platform_params = mapped_params.copy()
+                                        _process_create_app_result(
+                                            network_key, network_display, platform_params, result
+                                        )
                                 elif network_key == "mintegral":
                                     # Mintegral: process each platform separately
                                     for platform, result, response in results:
@@ -853,10 +855,12 @@ def render_new_create_app_ui():
                             app_info["project_id"] = project_id
                             app_info["appCode"] = str(apple_game_id) if apple_game_id else (str(google_game_id) if google_game_id else str(project_id) if project_id else None)
                         elif network_key == "pangle":
-                            # Pangle: site_id from result.data
-                            site_id = result.get("site_id") or (result.get("data", {}) if isinstance(result.get("data"), dict) else {}).get("site_id")
-                            app_info["siteId"] = site_id
-                            app_info["appCode"] = site_id
+                            # Pangle: app_id from result.result (normalized response structure)
+                            result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+                            app_id = result_data.get("app_id")
+                            app_info["appId"] = app_id
+                            app_info["siteId"] = app_id
+                            app_info["appCode"] = str(app_id) if app_id else None
                         else:
                             # Default: try common fields
                             app_code = result.get("appCode") or result.get("appId") or result.get("appKey") or result.get("id")
@@ -893,7 +897,7 @@ def render_new_create_app_ui():
                                 mapped_params = preview_info.get("params", {})
                                 
                                 # For IronSource and other multi-platform networks, use results if available
-                                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral"] and results:
+                                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"] and results:
                                     # Use results from multi-platform creation
                                     extracted_info = None
                                     # Try to extract from first result

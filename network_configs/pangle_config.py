@@ -222,16 +222,30 @@ class PangleConfig(NetworkConfig):
         
         return True, ""
     
-    def build_app_payload(self, form_data: Dict) -> Dict:
+    def build_app_payload(self, form_data: Dict, platform: Optional[str] = None) -> Dict:
         """Build API payload for app creation
+        
+        Args:
+            form_data: Form data from UI
+            platform: "Android" or "iOS" (optional, for dual-platform creation)
         
         Note: timestamp, nonce, sign, version, status
         will be added by network_manager automatically
         user_id and role_id are included from form_data (set from .env in Create App page)
         """
+        # Determine download_url based on platform parameter
+        download_url = None
+        if platform == "Android":
+            download_url = form_data.get("androidDownloadUrl", "").strip()
+        elif platform == "iOS":
+            download_url = form_data.get("iosDownloadUrl", "").strip()
+        else:
+            # Legacy: use download_url if provided (backward compatibility)
+            download_url = form_data.get("download_url", "").strip()
+
         payload = {
             "app_name": form_data.get("app_name"),
-            "download_url": form_data.get("download_url"),
+            "download_url": download_url,
             "app_category_code": form_data.get("app_category_code"),
         }
         
@@ -241,17 +255,19 @@ class PangleConfig(NetworkConfig):
         if form_data.get("role_id"):
             payload["role_id"] = form_data.get("role_id")
         
-        # Include mask_rule_ids if provided (parse comma-separated string to list)
-        mask_rule_ids_str = form_data.get("mask_rule_ids", "")
-        if mask_rule_ids_str and mask_rule_ids_str.strip():
-            try:
-                # Parse comma-separated string to list of integers
-                mask_rule_ids = [int(id.strip()) for id in mask_rule_ids_str.split(",") if id.strip()]
-                if mask_rule_ids:
-                    payload["mask_rule_ids"] = mask_rule_ids
-            except ValueError:
-                # If parsing fails, skip it (validation should catch this)
-                pass
+        # Include mask_rule_ids (default: "531582")
+        mask_rule_ids_str = form_data.get("mask_rule_ids", "531582")
+        try:
+            # Parse comma-separated string to list of integers
+            mask_rule_ids = [int(id.strip()) for id in mask_rule_ids_str.split(",") if id.strip()]
+            if mask_rule_ids:
+                payload["mask_rule_ids"] = mask_rule_ids
+            else:
+                # Empty list after parsing, use default
+                payload["mask_rule_ids"] = [531582]
+        except ValueError:
+            # If parsing fails, use default
+            payload["mask_rule_ids"] = [531582]
         
         # Include coppa_value if provided (default is 0)
         coppa_value = form_data.get("coppa_value", 0)

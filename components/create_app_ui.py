@@ -315,8 +315,11 @@ def _process_create_app_result(current_network: str, network_display: str, form_
         # IronSource: result contains appKey directly
         app_code = result.get("appKey")
     elif current_network == "pangle":
-        # Pangle: result.data contains site_id, or result itself
-        app_code = result.get("site_id") or (result.get("data", {}) if isinstance(result.get("data"), dict) else {}).get("site_id")
+        # Pangle: app_id from result.result (normalized response structure)
+        # Response format: {"status": 0, "code": 0, "msg": "Success", "result": {"app_id": 50014768, "status": 2}}
+        result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+        app_id = result_data.get("app_id")
+        app_code = str(app_id) if app_id else None
     elif current_network == "mintegral":
         # Mintegral: result.result contains app_id
         # Response format: {"status": 0, "code": 0, "msg": "Success", "result": {"app_id": 441875, ...}}

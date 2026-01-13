@@ -8,5 +8,6 @@ from .inmobi_api import InMobiAPI
 from .fyber_api import FyberAPI
 from .applovin_api import AppLovinAPI
 from .unity_api import UnityAPI
+from .pangle_api import PangleAPI
 
-__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI', 'AppLovinAPI', 'UnityAPI']
+__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI', 'AppLovinAPI', 'UnityAPI', 'PangleAPI']

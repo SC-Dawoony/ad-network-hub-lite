@@ -63,7 +63,6 @@ st.divider()
 available_networks = get_network_display_names()
 if len(available_networks) > 1:
     # Sort networks: AppLovin first, Unity second, then others
-    # Temporarily exclude Pangle from Create App page
     network_items = list(available_networks.items())
     applovin_item = None
     unity_item = None
@@ -73,9 +72,6 @@ if len(available_networks) > 1:
             applovin_item = (key, display)
         elif key == "unity":
             unity_item = (key, display)
-        elif key == "pangle":
-            # Temporarily exclude Pangle from Create App page
-            continue
         else:
             other_items.append((key, display))
     
@@ -93,15 +89,6 @@ if len(available_networks) > 1:
     # Create sorted dict and list of display names
     sorted_networks = dict(sorted_items)
     sorted_display_names = list(sorted_networks.values())
-    
-    # If current network is Pangle (which is excluded), show a warning and switch to first available network
-    if current_network == "pangle":
-        st.warning("⚠️ TikTok (Pangle) is temporarily disabled in Create App page.")
-        if sorted_display_names:
-            # Switch to first available network (usually AppLovin)
-            first_network_key = list(sorted_networks.keys())[0]
-            SessionManager.switch_network(first_network_key)
-            st.rerun()
     
     selected_display = st.selectbox(
         "Select Network",
