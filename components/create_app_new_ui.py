@@ -12,6 +12,132 @@ from utils.app_store_helper import get_ios_app_details, get_android_app_details
 logger = logging.getLogger(__name__)
 
 
+def create_ad_units_immediately(network_key: str, network_display: str, app_response: dict, mapped_params: dict, 
+                                 platform: str, config, network_manager, app_name: str):
+    """Create ad units immediately after app creation success
+    
+    Args:
+        network_key: Network identifier (e.g., "bigoads", "inmobi")
+        network_display: Network display name
+        app_response: App creation response
+        mapped_params: Mapped parameters from preview
+        platform: Platform string ("Android" or "iOS")
+        config: Network config object
+        network_manager: Network manager instance
+        app_name: App name
+    
+    Returns:
+        List of created unit results
+    """
+    from components.create_app_new_ui import extract_app_info_from_response
+    from components.create_app_helpers import generate_slot_name
+    
+    created_units = []
+    
+    # Extract app info to get appId/appCode
+    app_info = extract_app_info_from_response(network_key, app_response, mapped_params)
+    
+    if not app_info:
+        return created_units
+    
+    app_code = app_info.get("appCode") or app_info.get("appId") or app_info.get("appKey")
+    if not app_code:
+        return created_units
+    
+    # Get package name/bundle ID for unit name generation
+    platform_lower = platform.lower()
+    if platform_lower == "android":
+        pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+        if not pkg_name and network_key == "inmobi":
+            android_info = st.session_state.get("store_info_android", {})
+            if android_info:
+                pkg_name = android_info.get("package_name", "")
+        bundle_id = ""
+        android_package_for_unit = None
+    else:  # iOS
+        pkg_name = ""
+        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+        if not bundle_id and network_key == "inmobi":
+            ios_info = st.session_state.get("store_info_ios", {})
+            if ios_info:
+                bundle_id = ios_info.get("bundle_id", "")
+        # For iOS, try to use Android package name if available
+        android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
+        if not android_package_for_unit and network_key == "inmobi":
+            android_info = st.session_state.get("store_info_android", {})
+            if android_info:
+                android_package_for_unit = android_info.get("package_name", "")
+    
+    # Create RV, IS, BN units sequentially
+    for slot_type in ["rv", "is", "bn"]:
+        slot_name = generate_slot_name(
+            pkg_name,
+            platform_lower,
+            slot_type,
+            network_key,
+            bundle_id=bundle_id,
+            network_manager=network_manager,
+            app_name=app_name,
+            android_package_name=android_package_for_unit if platform_lower == "ios" else None
+        )
+        
+        if slot_name:
+            try:
+                # Build unit payload
+                if network_key == "bigoads":
+                    unit_payload = {
+                        "appCode": str(app_code).strip(),
+                        "name": slot_name,
+                    }
+                    if slot_type.lower() == "rv":
+                        unit_payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
+                    elif slot_type.lower() == "is":
+                        unit_payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
+                    elif slot_type.lower() == "bn":
+                        unit_payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
+                else:
+                    # Use config.build_unit_payload if available
+                    if hasattr(config, 'build_unit_payload'):
+                        unit_payload = config.build_unit_payload({
+                            "appCode": str(app_code).strip(),
+                            "name": slot_name,
+                            "slotType": slot_type.lower()
+                        })
+                    else:
+                        unit_payload = {
+                            "appCode": str(app_code).strip(),
+                            "name": slot_name,
+                        }
+                
+                # Create unit
+                with st.spinner(f"{network_display} - {platform} {slot_type.upper()} Unit 생성 중..."):
+                    unit_response = network_manager.create_unit(network_key, unit_payload)
+                    
+                    unit_success = unit_response.get('status') == 0 or unit_response.get('code') == 0
+                    if unit_success:
+                        st.success(f"✅ {network_display} - {platform} {slot_type.upper()} Unit 생성 완료!")
+                        if network_key not in st.session_state.creation_results:
+                            st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                        st.session_state.creation_results[network_key]["units"].append({
+                            "platform": platform,
+                            "app_name": app_name,
+                            "unit_name": slot_name,
+                            "unit_type": slot_type.upper(),
+                            "success": True
+                        })
+                        created_units.append({"slot_type": slot_type.upper(), "success": True, "slot_name": slot_name})
+                    else:
+                        error_msg = unit_response.get("msg", "Unknown error") if unit_response else "No response"
+                        st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {error_msg}")
+                        created_units.append({"slot_type": slot_type.upper(), "success": False, "error": error_msg})
+            except Exception as e:
+                st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {str(e)}")
+                logger.error(f"Error creating {slot_type} unit for {network_key} {platform}: {str(e)}", exc_info=True)
+                created_units.append({"slot_type": slot_type.upper(), "success": False, "error": str(e)})
+    
+    return created_units
+
+
 def map_store_info_to_network_params(
     ios_info: Optional[Dict],
     android_info: Optional[Dict],
@@ -639,6 +765,12 @@ def render_new_create_app_ui():
                                             st.success(f"✅ {network_display} - Android 앱 생성 성공!")
                                             if is_success:
                                                 success_count += 1
+                                                
+                                                # Immediately create ad units after app creation success
+                                                create_ad_units_immediately(
+                                                    network_key, network_display, android_response, mapped_params,
+                                                    "Android", config, network_manager, app_name
+                                                )
                                             
                                             # Show result (no masking for Vungle to show actual response)
                                             with st.expander(f"📥 {network_display} - Android 응답", expanded=False):
@@ -678,6 +810,12 @@ def render_new_create_app_ui():
                                             st.success(f"✅ {network_display} - iOS 앱 생성 성공!")
                                             if is_success:
                                                 success_count += 1
+                                                
+                                                # Immediately create ad units after app creation success
+                                                create_ad_units_immediately(
+                                                    network_key, network_display, ios_response, mapped_params,
+                                                    "iOS", config, network_manager, app_name
+                                                )
                                             
                                             # Show result (no masking for Vungle to show actual response)
                                             with st.expander(f"📥 {network_display} - iOS 응답", expanded=False):
