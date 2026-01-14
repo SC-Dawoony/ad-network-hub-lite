@@ -29,6 +29,7 @@ class MockNetworkManager:
         self._applovin_api = None
         self._unity_api = None
         self._pangle_api = None
+        self._vungle_api = None
     
     def get_client(self, network: str):
         """Get API client for a network"""
@@ -74,6 +75,12 @@ class MockNetworkManager:
                 from utils.network_apis.unity_api import UnityAPI
                 self._unity_api = UnityAPI()
             return self._unity_api.create_app(payload)
+        elif network == "vungle":
+            # Use new VungleAPI
+            if self._vungle_api is None:
+                from utils.network_apis.vungle_api import VungleAPI
+                self._vungle_api = VungleAPI()
+            return self._vungle_api.create_app(payload)
         
         # Mock implementation for other networks
         logger.info(f"[{network.title()}] API Request: Create App (Mock)")
@@ -325,6 +332,12 @@ class MockNetworkManager:
                 from utils.network_apis.unity_api import UnityAPI
                 self._unity_api = UnityAPI()
             return self._unity_api.create_unit(payload, app_key=app_key)
+        elif network == "vungle":
+            # Use new VungleAPI
+            if self._vungle_api is None:
+                from utils.network_apis.vungle_api import VungleAPI
+                self._vungle_api = VungleAPI()
+            return self._vungle_api.create_unit(payload, app_key=app_key)
         
         # Mock implementation for other networks
         logger.info(f"[{network.title()}] API Request: Create Unit (Mock)")

@@ -381,6 +381,13 @@ def _process_create_app_result(current_network: str, network_display: str, form_
             fyber_result = result
         app_id = fyber_result.get("appId") or fyber_result.get("id")
         app_code = str(app_id) if app_id else None
+    elif current_network == "vungle":
+        # Vungle: result.result contains vungleAppId and platform
+        # Response format: {"status": 0, "code": 0, "msg": "Success", "result": {"vungleAppId": "5e56099c57d130000137da68", "id": "5e56099c57d130000137da68", "platform": "ios", ...}}
+        result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else result
+        vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+        app_id = vungle_app_id
+        app_code = str(vungle_app_id) if vungle_app_id else None
     else:
         # BigOAds: result.result contains appCode (from _create_bigoads_app normalization)
         # The normalized response has result.result containing the actual data
@@ -392,8 +399,8 @@ def _process_create_app_result(current_network: str, network_display: str, form_
     
     app_name = form_data.get("app_name") or form_data.get("appName") or form_data.get("name", "Unknown")
     
-    # For IronSource, Pangle, Mintegral, InMobi, and Fyber, we don't have platform/pkgName in the same way
-    if current_network in ["ironsource", "pangle", "mintegral", "inmobi", "fyber"]:
+    # For IronSource, Pangle, Mintegral, InMobi, Fyber, and Vungle, we don't have platform/pkgName in the same way
+    if current_network in ["ironsource", "pangle", "mintegral", "inmobi", "fyber", "vungle"]:
         platform = None
         platform_str = None
         pkg_name = None
@@ -419,6 +426,22 @@ def _process_create_app_result(current_network: str, network_display: str, form_
                 platform = platform_value if isinstance(platform_value, int) else (1 if platform_value == "Android" else 2)
                 platform_str = "android" if platform == 1 else "ios"
             pkg_name = fyber_result.get("bundle", "") or form_data.get("pkgName", "")
+        elif current_network == "vungle":
+            # Vungle: Extract platform from API response
+            vungle_result = result.get("result", {})
+            platform_value = vungle_result.get("platform", "").lower()
+            if platform_value == "android":
+                platform_str = "android"
+                platform = 1
+            elif platform_value == "ios":
+                platform_str = "ios"
+                platform = 2
+            else:
+                # Fallback to form_data if not in response
+                platform_value = form_data.get("platform", "ios")
+                platform_str = "ios" if platform_value.lower() == "ios" else "android"
+                platform = 2 if platform_str == "ios" else 1
+            pkg_name = form_data.get("pkgName", "")  # Vungle doesn't return package name in response
         else:
             platform = form_data.get("platform", 1)  # 1 = Android, 2 = iOS
             platform_str = "android" if platform == 1 else "ios"
@@ -441,6 +464,7 @@ def _process_create_app_result(current_network: str, network_display: str, form_
         "siteId": app_code if current_network == "pangle" else None,  # Store siteId separately for Pangle
         "app_id": app_id if current_network in ["mintegral", "inmobi"] else (int(app_code) if app_code and app_code != "N/A" and str(app_code).isdigit() else None),  # Store app_id separately for Mintegral and InMobi
         "gameId": unity_game_ids if current_network == "unity" else None,  # Store gameIds separately for Unity
+        "vungleAppId": app_code if current_network == "vungle" else None,  # Store vungleAppId separately for Vungle
         "name": app_name,
         "pkgName": pkg_name,
         "platform": platform,
@@ -507,6 +531,11 @@ def _process_create_app_result(current_network: str, network_display: str, form_
                 fyber_result = result
             fyber_app_id = fyber_result.get("appId") or fyber_result.get("id") or app_code
             st.write(f"**App ID:** {fyber_app_id}")
+        elif current_network == "vungle":
+            # Vungle: Display App ID (vungleAppId)
+            vungle_result = result.get("result", {}) if isinstance(result.get("result"), dict) else result
+            vungle_app_id = vungle_result.get("vungleAppId") or vungle_result.get("id") or app_code
+            st.write(f"**App ID (vungleAppId):** {vungle_app_id}")
         else:
             st.write(f"**App Code:** {result.get('appCode', app_code)}")
         with result_col2:
@@ -519,6 +548,17 @@ def _process_create_app_result(current_network: str, network_display: str, form_
                 if fyber_platform == "android":
                     platform_display = "Android"
                 elif fyber_platform == "ios":
+                    platform_display = "iOS"
+                else:
+                    platform_display = platform_str.capitalize() if platform_str else "N/A"
+                st.write(f"**Platform:** {platform_display}")
+            elif current_network == "vungle":
+                # Vungle: Get platform from API response
+                vungle_result = result.get("result", {}) if isinstance(result.get("result"), dict) else result
+                vungle_platform = vungle_result.get("platform", "").lower()
+                if vungle_platform == "android":
+                    platform_display = "Android"
+                elif vungle_platform == "ios":
                     platform_display = "iOS"
                 else:
                     platform_display = platform_str.capitalize() if platform_str else "N/A"

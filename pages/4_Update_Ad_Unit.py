@@ -2381,7 +2381,25 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     elif actual_network == "vungle":
                                         # Vungle uses vungleAppId from application object
                                         # app_id should already contain vungleAppId from match_applovin_unit_to_network
-                                        ad_network_app_id = str(app_id) if app_id else ""
+                                        # But if app_id is empty, try to get from matched_app directly
+                                        if app_id:
+                                            ad_network_app_id = str(app_id)
+                                        elif matched_app:
+                                            # Fallback: try to get vungleAppId from matched_app directly
+                                            vungle_app_id = matched_app.get("vungleAppId") or matched_app.get("appId") or matched_app.get("applicationId") or matched_app.get("id")
+                                            ad_network_app_id = str(vungle_app_id) if vungle_app_id else ""
+                                            if ad_network_app_id:
+                                                logger.info(f"[Vungle] Using matched_app directly for ad_network_app_id: {ad_network_app_id}")
+                                        else:
+                                            ad_network_app_id = ""
+                                        
+                                        # Debug logging for Vungle
+                                        if not ad_network_app_id:
+                                            logger.warning(f"[Vungle] ad_network_app_id is empty! app_id={app_id}, app_key={app_key}, app_ids={app_ids}")
+                                            logger.warning(f"[Vungle] matched_app keys: {list(matched_app.keys()) if matched_app else []}")
+                                            if matched_app:
+                                                logger.warning(f"[Vungle] matched_app vungleAppId: {matched_app.get('vungleAppId')}, appId: {matched_app.get('appId')}")
+                                        
                                         ad_network_app_key = ""  # Empty for Vungle
                                     elif actual_network == "unity":
                                         # Unity uses gameId from stores (platform-specific)

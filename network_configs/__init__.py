@@ -8,6 +8,7 @@ from .inmobi_config import InMobiConfig
 from .fyber_config import FyberConfig
 from .applovin_config import AppLovinConfig
 from .unity_config import UnityConfig
+from .vungle_config import VungleConfig
 
 # Network registry
 NETWORK_REGISTRY = {
@@ -19,6 +20,7 @@ NETWORK_REGISTRY = {
     'fyber': FyberConfig(),
     'applovin': AppLovinConfig(),
     'unity': UnityConfig(),
+    'vungle': VungleConfig(),
     # Future networks will be added here
 }
 

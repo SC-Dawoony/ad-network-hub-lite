@@ -456,67 +456,134 @@ def match_applovin_unit_to_network(
     app_name = applovin_unit.get("name", "")
     platform = applovin_unit.get("platform", "").lower()
     
-    # For Vungle, placements contain app info, so we need to search placements
+    # For Vungle, use applications API directly (more reliable than placements)
     if network == "vungle":
-        placements = get_vungle_placements()
-        if not placements:
-            return None
-        
-        # Search for placement matching package_name or app_name
-        for placement in placements:
-            # Parse application object (can be string or dict)
-            application = placement.get("application", {})
-            if isinstance(application, str):
-                try:
-                    import json
-                    application = json.loads(application)
-                except (json.JSONDecodeError, TypeError):
-                    logger.warning(f"[Vungle] Failed to parse application JSON: {application}")
-                    application = {}
+        try:
+            from utils.network_manager import get_network_manager
+            network_manager = get_network_manager()
+            apps = network_manager.get_apps("vungle")
             
-            # Extract app info from application object
-            placement_pkg = application.get("store", {}).get("id", "")  # Store ID can be used as package identifier
-            placement_app_name = application.get("name", "")
-            placement_platform = application.get("platform", "").lower()
-            vungle_app_id = application.get("vungleAppId", "")
-            application_id = application.get("id", "")
+            if not apps:
+                logger.warning(f"[Vungle] No apps found")
+                return None
             
-            # Normalize platform for comparison
-            placement_platform_normalized = _normalize_platform_for_matching(placement_platform, network)
             target_platform_normalized = _normalize_platform_for_matching(platform, network)
             
-            # Match by package name first (using store.id or application.id)
-            if package_name:
-                # Try matching with store.id (iOS App Store ID or Android package)
-                if placement_pkg and package_name.lower() == placement_pkg.lower():
-                    if placement_platform_normalized == target_platform_normalized:
-                        # Extract app info from placement with vungleAppId
-                        return {
-                            "appId": vungle_app_id or application_id,  # Use vungleAppId as primary identifier
-                            "vungleAppId": vungle_app_id,  # Store vungleAppId separately
-                            "applicationId": application_id,
-                            "name": placement_app_name,
-                            "platform": placement_platform,
-                            "packageName": placement_pkg,
-                            "storeId": placement_pkg
-                        }
+            # For iOS, store.id is App Store ID (numeric), not bundle ID
+            # For Android, store.id is package name
+            # So for iOS, we can't match by package_name (bundle ID) using store.id
+            # We need to match by app name instead
             
-            # Fallback to app name matching
-            if app_name and placement_app_name:
-                if app_name.lower() in placement_app_name.lower() or placement_app_name.lower() in app_name.lower():
-                    if placement_platform_normalized == target_platform_normalized:
-                        # Extract app info from placement with vungleAppId
+            # Match by package name first (only for Android - store.id is package name)
+            if package_name and target_platform_normalized == "android":
+                for app in apps:
+                    app_platform = app.get("platform", "").lower()
+                    app_platform_normalized = _normalize_platform_for_matching(app_platform, network)
+                    
+                    if app_platform_normalized != target_platform_normalized:
+                        continue
+                    
+                    # Get store.id from app.store.id (Android: package name)
+                    store_info = app.get("store", {})
+                    if isinstance(store_info, dict):
+                        app_store_id = store_info.get("id", "")
+                        if app_store_id and package_name.lower() == app_store_id.lower():
+                            # Match found by store.id (package name for Android)
+                            vungle_app_id = app.get("vungleAppId") or app.get("id", "")
+                            app_name_match = app.get("name", "")
+                            logger.info(f"[Vungle] Matched Android app by package_name: {package_name} -> {vungle_app_id}")
+                            return {
+                                "appId": vungle_app_id,
+                                "vungleAppId": vungle_app_id,
+                                "applicationId": app.get("id", ""),
+                                "name": app_name_match,
+                                "platform": app_platform,
+                                "packageName": app_store_id,
+                                "storeId": app_store_id
+                            }
+            
+            # Match by app name (works for both iOS and Android)
+            # For iOS, AppLovin app names may have suffixes like " iOS RV", " iOS IS", " iOS BN"
+            # We need to normalize the app name by removing these suffixes before matching
+            if app_name:
+                # Normalize AppLovin app name: remove " iOS RV", " iOS IS", " iOS BN", etc.
+                normalized_applovin_name = app_name
+                # Remove common suffixes from AppLovin ad unit names
+                suffixes_to_remove = [" ios rv", " ios is", " ios bn", " ios", " android rv", " android is", " android bn", " android"]
+                for suffix in suffixes_to_remove:
+                    if normalized_applovin_name.lower().endswith(suffix):
+                        normalized_applovin_name = normalized_applovin_name[:-len(suffix)].strip()
+                        break
+                
+                logger.info(f"[Vungle] Matching {platform} app: AppLovin name='{app_name}' (normalized='{normalized_applovin_name}')")
+                
+                best_match = None
+                best_match_score = 0
+                
+                for app in apps:
+                    app_platform = app.get("platform", "").lower()
+                    app_platform_normalized = _normalize_platform_for_matching(app_platform, network)
+                    
+                    if app_platform_normalized != target_platform_normalized:
+                        continue
+                    
+                    app_name_match = app.get("name", "")
+                    if not app_name_match:
+                        continue
+                    
+                    app_name_match_lower = app_name_match.lower()
+                    normalized_applovin_name_lower = normalized_applovin_name.lower()
+                    
+                    # Try exact match with normalized name (highest priority)
+                    if normalized_applovin_name_lower == app_name_match_lower:
+                        vungle_app_id = app.get("vungleAppId") or app.get("id", "")
+                        store_info = app.get("store", {})
+                        app_store_id = store_info.get("id", "") if isinstance(store_info, dict) else ""
+                        logger.info(f"[Vungle] Matched {platform} app by exact normalized app_name: '{normalized_applovin_name}' == '{app_name_match}' -> {vungle_app_id}")
                         return {
-                            "appId": vungle_app_id or application_id,  # Use vungleAppId as primary identifier
-                            "vungleAppId": vungle_app_id,  # Store vungleAppId separately
-                            "applicationId": application_id,
-                            "name": placement_app_name,
-                            "platform": placement_platform,
-                            "packageName": placement_pkg,
-                            "storeId": placement_pkg
+                            "appId": vungle_app_id,
+                            "vungleAppId": vungle_app_id,
+                            "applicationId": app.get("id", ""),
+                            "name": app_name_match,
+                            "platform": app_platform,
+                            "packageName": app_store_id,
+                            "storeId": app_store_id
                         }
-        
-        return None
+                    
+                    # Try if normalized name is contained in Vungle name (high priority)
+                    if normalized_applovin_name_lower in app_name_match_lower:
+                        best_match = app
+                        best_match_score = 2
+                    
+                    # Try if Vungle name is contained in normalized name (medium priority)
+                    elif app_name_match_lower in normalized_applovin_name_lower and best_match_score < 1:
+                        best_match = app
+                        best_match_score = 1
+                
+                # Return best match if found
+                if best_match:
+                    vungle_app_id = best_match.get("vungleAppId") or best_match.get("id", "")
+                    app_name_match = best_match.get("name", "")
+                    store_info = best_match.get("store", {})
+                    app_store_id = store_info.get("id", "") if isinstance(store_info, dict) else ""
+                    logger.info(f"[Vungle] Matched {platform} app by partial app_name: '{normalized_applovin_name}' in '{app_name_match}' (score={best_match_score}) -> {vungle_app_id}")
+                    return {
+                        "appId": vungle_app_id,
+                        "vungleAppId": vungle_app_id,
+                        "applicationId": best_match.get("id", ""),
+                        "name": app_name_match,
+                        "platform": best_match.get("platform", "").lower(),
+                        "packageName": app_store_id,
+                        "storeId": app_store_id
+                    }
+            
+            logger.warning(f"[Vungle] No matching app found for package_name='{package_name}', app_name='{app_name}', platform='{platform}'")
+            return None
+        except Exception as e:
+            logger.error(f"[Vungle] Error matching app: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
     
     # For Unity, match by app name or storeId
     if network == "unity":
@@ -1873,8 +1940,13 @@ def extract_app_identifiers(app: Dict, network: str) -> Dict[str, Optional[str]]
         logger.info(f"[Fyber] extract_app_identifiers: app keys={list(app.keys())}, id={app.get('id')}, appId={app.get('appId')}, extracted app_id={app_id_value}")
     elif network == "vungle":
         # Vungle uses vungleAppId from application object
-        result["app_id"] = app.get("vungleAppId") or app.get("appId") or app.get("applicationId") or app.get("id")
-        result["app_code"] = str(result["app_id"]) if result["app_id"] else None
+        # match_applovin_unit_to_network returns app with "vungleAppId" and "appId" fields
+        # Priority: vungleAppId > appId > applicationId > id
+        vungle_app_id = app.get("vungleAppId") or app.get("appId") or app.get("applicationId") or app.get("id")
+        result["app_id"] = vungle_app_id
+        result["app_code"] = str(vungle_app_id) if vungle_app_id else None
+        # Debug logging for Vungle
+        logger.info(f"[Vungle] extract_app_identifiers: app keys={list(app.keys())}, vungleAppId={app.get('vungleAppId')}, appId={app.get('appId')}, extracted app_id={vungle_app_id}")
     elif network == "unity":
         # Unity uses gameId from stores (platform-specific)
         # projectId is stored for reference, but gameId will be extracted based on platform

@@ -105,6 +105,7 @@ def map_store_info_to_network_params(
         android_category = android_info.get("category", "") if android_info else None
         params["app_category_code"] = config.match_category_code(ios_category, android_category)
         params["coppa_value"] = 0  # Default: For users aged 13 and above
+        params["mask_rule_ids"] = "531582"  # Default mask rule IDs
     
     elif network == "mintegral":
         # Mintegral requires separate payloads for iOS and Android
@@ -137,6 +138,21 @@ def map_store_info_to_network_params(
         # Default values
         params["adsProvider"] = ["max"]  # Default: MAX
         params["coppa"] = "non_compliant"  # Default
+    
+    elif network == "vungle":
+        # Vungle requires separate payloads for iOS and Android
+        # Store base params separately for each platform
+        params["name"] = app_name or ""
+        
+        # Store platform-specific info separately
+        if ios_info:
+            params["ios_name"] = ios_info.get("name", "")
+            params["ios_store_id"] = ios_info.get("app_id", "")  # App ID for iOS
+            params["ios_store_url"] = f"https://apps.apple.com/us/app/id{ios_info.get('app_id')}"
+        if android_info:
+            params["android_name"] = android_info.get("name", "")
+            params["android_store_id"] = android_info.get("package_name", "")  # Package name for Android
+            params["android_store_url"] = f"https://play.google.com/store/apps/details?id={android_info.get('package_name')}"
     
     return params
 
@@ -372,7 +388,7 @@ def render_new_create_app_ui():
                 payloads = {}
                 
                 # Handle networks that support both iOS and Android
-                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "pangle"]:
+                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "pangle", "vungle"]:
                     if st.session_state.store_info_android:
                         try:
                             android_payload = config.build_app_payload(mapped_params, platform="Android")
@@ -576,7 +592,7 @@ def render_new_create_app_ui():
                         network_manager = get_network_manager()
                         
                         # Handle networks that support both iOS and Android
-                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"]:
+                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle", "vungle"]:
                             results = []
                             
                             # Android
@@ -593,7 +609,7 @@ def render_new_create_app_ui():
                                         is_success = android_response.get('status') == 0 or android_response.get('code') == 0
                                         total_count += 1
                                         
-                                        android_result = handle_api_response(android_response)
+                                        android_result = handle_api_response(android_response, network=network_key)
                                         if android_result:
                                             results.append(("Android", android_result, android_response))
                                             
@@ -611,9 +627,12 @@ def render_new_create_app_ui():
                                             if is_success:
                                                 success_count += 1
                                             
-                                            # Show result
+                                            # Show result (no masking for Vungle to show actual response)
                                             with st.expander(f"📥 {network_display} - Android 응답", expanded=False):
-                                                st.json(_mask_sensitive_data(android_response))
+                                                if network_key == "vungle":
+                                                    st.json(android_response)
+                                                else:
+                                                    st.json(mask_sensitive_data(android_response))
                                             
                             # iOS
                             if "iOS" in payloads:
@@ -629,7 +648,7 @@ def render_new_create_app_ui():
                                         is_success = ios_response.get('status') == 0 or ios_response.get('code') == 0
                                         total_count += 1
                                         
-                                        ios_result = handle_api_response(ios_response)
+                                        ios_result = handle_api_response(ios_response, network=network_key)
                                         if ios_result:
                                             results.append(("iOS", ios_result, ios_response))
                                             
@@ -647,9 +666,12 @@ def render_new_create_app_ui():
                                             if is_success:
                                                 success_count += 1
                                             
-                                            # Show result
+                                            # Show result (no masking for Vungle to show actual response)
                                             with st.expander(f"📥 {network_display} - iOS 응답", expanded=False):
-                                                st.json(_mask_sensitive_data(ios_response))
+                                                if network_key == "vungle":
+                                                    st.json(ios_response)
+                                                else:
+                                                    st.json(mask_sensitive_data(ios_response))
                             
                             if results:
                                 # Store response and results
@@ -703,6 +725,13 @@ def render_new_create_app_ui():
                                         _process_create_app_result(
                                             network_key, network_display, platform_params, result
                                         )
+                                elif network_key == "vungle":
+                                    # Vungle: process each platform separately (similar to Mintegral/Pangle)
+                                    for platform, result, response in results:
+                                        platform_params = mapped_params.copy()
+                                        _process_create_app_result(
+                                            network_key, network_display, platform_params, result
+                                        )
                         else:
                             # Single platform or other networks
                             if "default" in payloads:
@@ -741,7 +770,7 @@ def render_new_create_app_ui():
                                     
                                     # Show result
                                     with st.expander(f"📥 {network_display} 응답", expanded=False):
-                                        st.json(_mask_sensitive_data(response))
+                                        st.json(mask_sensitive_data(response))
                                     
                                     # Process result
                                     from components.create_app_ui import _process_create_app_result
@@ -872,6 +901,25 @@ def render_new_create_app_ui():
                             app_info["appId"] = app_id
                             app_info["siteId"] = app_id
                             app_info["appCode"] = str(app_id) if app_id else None
+                        elif network_key == "vungle":
+                            # Vungle: vungleAppId from result (response is the app object itself)
+                            result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else result
+                            vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+                            app_info["vungleAppId"] = vungle_app_id
+                            app_info["appId"] = vungle_app_id
+                            app_info["appCode"] = str(vungle_app_id) if vungle_app_id else None
+                            app_info["platform"] = result_data.get("platform", "")  # "ios" or "android"
+                            app_info["name"] = result_data.get("name", "")
+                            
+                            # Extract platform-specific package name/bundle ID from mapped_params
+                            platform_value = result_data.get("platform", "").lower()
+                            if platform_value == "android":
+                                app_info["pkgName"] = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                app_info["platformStr"] = "android"
+                            elif platform_value == "ios":
+                                app_info["bundleId"] = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
+                                app_info["pkgName"] = ""  # iOS doesn't use pkgName
+                                app_info["platformStr"] = "ios"
                         else:
                             # Default: try common fields
                             app_code = result.get("appCode") or result.get("appId") or result.get("appKey") or result.get("id")
@@ -879,9 +927,33 @@ def render_new_create_app_ui():
                         
                         # Add common fields
                         app_info["name"] = result.get("name") or mapped_params.get("name") or mapped_params.get("app_name") or "Unknown"
-                        app_info["platformStr"] = mapped_params.get("platformStr") or mapped_params.get("platform", "android")
-                        app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
-                        app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
+                        
+                        # Extract platform-specific package name and bundle ID for all networks
+                        # Android: use package name, iOS: use bundle ID
+                        platform_str = mapped_params.get("platformStr") or mapped_params.get("platform", "android")
+                        platform_value = platform_str.lower() if isinstance(platform_str, str) else "android"
+                        
+                        # For multi-platform networks, extract from platform-specific fields in mapped_params
+                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"]:
+                            # Try to get from platform-specific fields first
+                            if platform_value == "android" or "Android" in str(platform_str):
+                                app_info["pkgName"] = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("package", ""))))
+                                app_info["bundleId"] = ""  # Android doesn't use bundleId
+                                app_info["platformStr"] = "android"
+                            elif platform_value == "ios" or "iOS" in str(platform_str) or "IOS" in str(platform_str):
+                                app_info["pkgName"] = ""  # iOS doesn't use pkgName
+                                app_info["bundleId"] = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("bundle", mapped_params.get("bundleId", "")))))
+                                app_info["platformStr"] = "ios"
+                            else:
+                                # Fallback: try generic fields
+                                app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
+                                app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
+                                app_info["platformStr"] = platform_value
+                        else:
+                            # Single platform or other networks: use generic fields
+                            app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
+                            app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
+                            app_info["platformStr"] = platform_value
                         
                         return app_info if app_info.get("appCode") else None
                     
@@ -907,7 +979,7 @@ def render_new_create_app_ui():
                                 mapped_params = preview_info.get("params", {})
                                 
                                 # For IronSource and other multi-platform networks, use results if available
-                                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"] and results:
+                                if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle", "vungle"] and results:
                                     # Use results from multi-platform creation
                                     extracted_info = None
                                     # Try to extract from first result
@@ -1079,7 +1151,7 @@ def render_new_create_app_ui():
                                                         st.error(f"❌ Android {ad_format} Unit 생성 실패")
                                                         if response:
                                                             with st.expander(f"Error Details - {ad_format}", expanded=False):
-                                                                st.json(_mask_sensitive_data(response))
+                                                                st.json(mask_sensitive_data(response))
                                                 except Exception as e:
                                                     failure_count_android += 1
                                                     st.error(f"❌ Android {ad_format} 오류: {str(e)}")
@@ -1183,7 +1255,7 @@ def render_new_create_app_ui():
                                                         st.error(f"❌ iOS {ad_format} Unit 생성 실패")
                                                         if response:
                                                             with st.expander(f"Error Details - {ad_format}", expanded=False):
-                                                                st.json(_mask_sensitive_data(response))
+                                                                st.json(mask_sensitive_data(response))
                                                 except Exception as e:
                                                     failure_count_ios += 1
                                                     
@@ -1225,15 +1297,44 @@ def render_new_create_app_ui():
                             
                             # Display app info
                             st.markdown(f"**앱 정보:** {app_name}")
-                            info_cols = st.columns(3)
-                            with info_cols[0]:
-                                st.text(f"**App Code:** {app_code}")
-                            with info_cols[1]:
-                                if app_info.get("appId"):
-                                    st.text(f"**App ID:** {app_info.get('appId')}")
-                            with info_cols[2]:
-                                if app_info.get("appKey"):
-                                    st.text(f"**App Key:** {app_info.get('appKey')}")
+                            
+                            # For Vungle, show platform-specific App IDs
+                            if network_key == "vungle" and app_data.get("results"):
+                                # Vungle: Show Android and iOS App IDs separately
+                                results_list = app_data.get("results", [])
+                                android_app_id = None
+                                ios_app_id = None
+                                
+                                for platform, result, response in results_list:
+                                    result_data = response.get("result", {}) if isinstance(response.get("result"), dict) else response
+                                    vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+                                    if platform == "Android":
+                                        android_app_id = vungle_app_id
+                                    elif platform == "iOS":
+                                        ios_app_id = vungle_app_id
+                                
+                                info_cols = st.columns(2)
+                                with info_cols[0]:
+                                    if android_app_id:
+                                        st.text(f"**🤖 Android App ID:** {android_app_id}")
+                                    else:
+                                        st.text("**🤖 Android App ID:** -")
+                                with info_cols[1]:
+                                    if ios_app_id:
+                                        st.text(f"**🍎 iOS App ID:** {ios_app_id}")
+                                    else:
+                                        st.text("**🍎 iOS App ID:** -")
+                            else:
+                                # Other networks: show standard app info
+                                info_cols = st.columns(3)
+                                with info_cols[0]:
+                                    st.text(f"**App Code:** {app_code}")
+                                with info_cols[1]:
+                                    if app_info.get("appId"):
+                                        st.text(f"**App ID:** {app_info.get('appId')}")
+                                with info_cols[2]:
+                                    if app_info.get("appKey"):
+                                        st.text(f"**App Key:** {app_info.get('appKey')}")
                             
                             # Archive/Deactivate existing units (if needed)
                             if network_key == "ironsource":
@@ -1375,26 +1476,223 @@ def render_new_create_app_ui():
                             
                             st.divider()
                             
-                            # Generate unit names for RV, IS, BN
+                            # For Vungle, handle each platform separately
+                            if network_key == "vungle" and app_data.get("results"):
+                                # Vungle: Create units for each platform separately
+                                results_list = app_data.get("results", [])
+                                
+                                # Get mapped_params from preview_data
+                                preview_info = preview_data.get(network_key, {})
+                                mapped_params = preview_info.get("params", {})
+                                
+                                for platform, result, response in results_list:
+                                    result_data = response.get("result", {}) if isinstance(response.get("result"), dict) else response
+                                    vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+                                    platform_value = result_data.get("platform", "").lower()
+                                    platform_display = "Android" if platform_value == "android" else "iOS"
+                                    
+                                    st.markdown(f"##### 📱 {platform_display}")
+                                    st.text(f"**App ID:** {vungle_app_id}")
+                                    
+                                    # Get platform-specific package name/bundle ID
+                                    if platform_value == "android":
+                                        pkg_name = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                        bundle_id = ""
+                                        platform_str_for_unit = "android"
+                                    elif platform_value == "ios":
+                                        pkg_name = ""
+                                        bundle_id = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
+                                        platform_str_for_unit = "ios"
+                                    else:
+                                        continue
+                                    
+                                    # Generate unit names for RV, IS, BN
+                                    from components.create_app_helpers import generate_slot_name
+                                    
+                                    network_manager = get_network_manager()
+                                    
+                                    unit_names = {}
+                                    for slot_type in ["rv", "is", "bn"]:
+                                        slot_name = generate_slot_name(
+                                            pkg_name, 
+                                            platform_str_for_unit, 
+                                            slot_type, 
+                                            network_key,
+                                            bundle_id=bundle_id,
+                                            network_manager=network_manager,
+                                            app_name=app_name
+                                        )
+                                        if slot_name:
+                                            unit_names[slot_type.upper()] = slot_name
+                                    
+                                    if unit_names:
+                                        st.markdown("**생성될 Unit 이름:**")
+                                        
+                                        unit_cols = st.columns(len(unit_names))
+                                        for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
+                                            with unit_cols[idx]:
+                                                st.text_input(
+                                                    f"{slot_type} Unit Name",
+                                                    value=slot_name,
+                                                    key=f"unit_name_{network_key}_{platform_value}_{slot_type}",
+                                                    disabled=True
+                                                )
+                                        
+                                        # Create buttons for each unit type
+                                        create_unit_cols = st.columns(len(unit_names))
+                                        for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
+                                            with create_unit_cols[idx]:
+                                                if st.button(
+                                                    f"✅ Create {slot_type} ({platform_display})",
+                                                    key=f"create_unit_{network_key}_{platform_value}_{slot_type}",
+                                                    use_container_width=True
+                                                ):
+                                                    try:
+                                                        # Build app_info for this platform
+                                                        platform_app_info = app_info.copy()
+                                                        platform_app_info["vungleAppId"] = vungle_app_id
+                                                        platform_app_info["appId"] = vungle_app_id
+                                                        platform_app_info["appCode"] = str(vungle_app_id)
+                                                        platform_app_info["platformStr"] = platform_str_for_unit
+                                                        platform_app_info["pkgName"] = pkg_name
+                                                        platform_app_info["bundleId"] = bundle_id
+                                                        platform_app_info["name"] = app_name
+                                                        
+                                                        from components.create_app_helpers import create_default_slot
+                                                        create_default_slot(
+                                                            network_key,
+                                                            platform_app_info,
+                                                            slot_type.lower(),
+                                                            network_manager,
+                                                            config
+                                                        )
+                                                        
+                                                        # Track unit creation result
+                                                        if network_key not in st.session_state.creation_results:
+                                                            st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                        st.session_state.creation_results[network_key]["units"].append({
+                                                            "platform": platform_display,
+                                                            "app_name": app_name,
+                                                            "unit_name": slot_name,
+                                                            "unit_type": slot_type.upper(),
+                                                            "success": True
+                                                        })
+                                                        
+                                                        st.success(f"✅ {slot_type} Unit 생성 완료! ({platform_display})")
+                                                    except Exception as e:
+                                                        # Track unit creation failure
+                                                        if network_key not in st.session_state.creation_results:
+                                                            st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                        st.session_state.creation_results[network_key]["units"].append({
+                                                            "platform": platform_display,
+                                                            "app_name": app_name,
+                                                            "unit_name": slot_name,
+                                                            "unit_type": slot_type.upper(),
+                                                            "success": False,
+                                                            "error": str(e)
+                                                        })
+                                                        
+                                                        st.error(f"❌ {slot_type} Unit 생성 실패 ({platform_display}): {str(e)}")
+                                                        logger.error(f"Error creating {slot_type} unit for {network_key} ({platform_display}): {str(e)}", exc_info=True)
+                                    else:
+                                        st.warning(f"⚠️ {platform_display}: Unit 이름을 생성할 수 없습니다.")
+                                    
+                                    st.markdown("---")
+                                
+                                # Skip the default unit creation logic for Vungle
+                                continue
+                            
+                            # Generate unit names for RV, IS, BN (for other networks)
+                            # For multi-platform networks, handle each platform separately
                             from components.create_app_helpers import generate_slot_name
                             
                             network_manager = get_network_manager()
-                            pkg_name = app_info.get("pkgNameDisplay") or app_info.get("pkgName", "")
-                            bundle_id = app_info.get("bundleId", "")
                             
-                            unit_names = {}
-                            for slot_type in ["rv", "is", "bn"]:
-                                slot_name = generate_slot_name(
-                                    pkg_name, 
-                                    platform_str, 
-                                    slot_type, 
-                                    network_key,
-                                    bundle_id=bundle_id,
-                                    network_manager=network_manager,
-                                    app_name=app_name
-                                )
-                                if slot_name:
-                                    unit_names[slot_type.upper()] = slot_name
+                            # Check if this is a multi-platform network with results
+                            if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"] and app_data.get("results"):
+                                # Multi-platform: generate unit names for each platform separately
+                                results_list = app_data.get("results", [])
+                                preview_info = preview_data.get(network_key, {})
+                                mapped_params = preview_info.get("params", {})
+                                
+                                # Collect unit names by platform
+                                unit_names_by_platform = {}
+                                for platform, result, response in results_list:
+                                    platform_value = platform.lower() if isinstance(platform, str) else "android"
+                                    
+                                    # Get platform-specific package name/bundle ID from mapped_params
+                                    if platform_value == "android":
+                                        pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+                                        bundle_id = ""  # Android uses package name only
+                                        platform_str_for_unit = "android"
+                                    elif platform_value == "ios":
+                                        pkg_name = ""  # iOS uses bundle ID only
+                                        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                        platform_str_for_unit = "ios"
+                                    else:
+                                        continue
+                                    
+                                    # Generate unit names for this platform
+                                    platform_unit_names = {}
+                                    for slot_type in ["rv", "is", "bn"]:
+                                        slot_name = generate_slot_name(
+                                            pkg_name,
+                                            platform_str_for_unit,
+                                            slot_type,
+                                            network_key,
+                                            bundle_id=bundle_id,
+                                            network_manager=network_manager,
+                                            app_name=app_name
+                                        )
+                                        if slot_name:
+                                            platform_unit_names[slot_type.upper()] = slot_name
+                                    
+                                    if platform_unit_names:
+                                        unit_names_by_platform[platform] = platform_unit_names
+                                
+                                # For display, show both platforms if available, or use first available
+                                if len(unit_names_by_platform) > 1:
+                                    # Multiple platforms: show Android first, then iOS
+                                    unit_names = {}
+                                    if "Android" in unit_names_by_platform:
+                                        unit_names = unit_names_by_platform["Android"]
+                                    elif "android" in unit_names_by_platform:
+                                        unit_names = unit_names_by_platform["android"]
+                                    else:
+                                        unit_names = list(unit_names_by_platform.values())[0]
+                                elif len(unit_names_by_platform) == 1:
+                                    unit_names = list(unit_names_by_platform.values())[0]
+                                else:
+                                    unit_names = {}
+                            else:
+                                # Single platform or fallback: use app_info directly with platform-specific logic
+                                platform_str_value = app_info.get("platformStr", "android").lower()
+                                
+                                # Use platform-specific values: Android -> pkgName, iOS -> bundleId
+                                if platform_str_value == "android":
+                                    pkg_name = app_info.get("pkgNameDisplay") or app_info.get("pkgName", "")
+                                    bundle_id = ""  # Android uses package name only
+                                elif platform_str_value == "ios":
+                                    pkg_name = ""  # iOS uses bundle ID only
+                                    bundle_id = app_info.get("bundleId", "")
+                                else:
+                                    # Fallback: try both, but prefer pkgName for Android-like, bundleId for iOS-like
+                                    pkg_name = app_info.get("pkgNameDisplay") or app_info.get("pkgName", "")
+                                    bundle_id = app_info.get("bundleId", "")
+                                
+                                unit_names = {}
+                                for slot_type in ["rv", "is", "bn"]:
+                                    slot_name = generate_slot_name(
+                                        pkg_name,
+                                        platform_str,
+                                        slot_type,
+                                        network_key,
+                                        bundle_id=bundle_id,
+                                        network_manager=network_manager,
+                                        app_name=app_name
+                                    )
+                                    if slot_name:
+                                        unit_names[slot_type.upper()] = slot_name
                             
                             if unit_names:
                                 st.markdown("##### ✅ Create Ad Units")

@@ -9,5 +9,6 @@ from .fyber_api import FyberAPI
 from .applovin_api import AppLovinAPI
 from .unity_api import UnityAPI
 from .pangle_api import PangleAPI
+from .vungle_api import VungleAPI
 
-__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI', 'AppLovinAPI', 'UnityAPI', 'PangleAPI']
+__all__ = ['BaseNetworkAPI', 'IronSourceAPI', 'BigOAdsAPI', 'MintegralAPI', 'InMobiAPI', 'FyberAPI', 'AppLovinAPI', 'UnityAPI', 'PangleAPI', 'VungleAPI']

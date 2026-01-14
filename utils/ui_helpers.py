@@ -9,11 +9,12 @@ from utils.helpers import mask_sensitive_data
 logger = logging.getLogger(__name__)
 
 
-def handle_api_response(response: Dict) -> Optional[Dict]:
+def handle_api_response(response: Dict, network: Optional[str] = None) -> Optional[Dict]:
     """Handle API response and display result
     
     Args:
         response: API response dictionary with status, code, msg, result
+        network: Optional network identifier (e.g., "vungle") to skip masking
         
     Returns:
         Result dictionary if success, None otherwise
@@ -25,15 +26,21 @@ def handle_api_response(response: Dict) -> Optional[Dict]:
     if response.get('status') == 0 or response.get('code') == 0:
         st.success("✅ Success!")
         
-        # Display full response in expander
+        # Display full response in expander (no masking for Vungle)
         with st.expander("📥 Full API Response", expanded=False):
-            st.json(mask_sensitive_data(response))
+            if network == "vungle":
+                st.json(response)
+            else:
+                st.json(mask_sensitive_data(response))
         
         result = response.get('result', {})
         if result:
-            # Display result separately for clarity
+            # Display result separately for clarity (no masking for Vungle)
             st.subheader("📝 Result Data")
-            st.json(mask_sensitive_data(result))
+            if network == "vungle":
+                st.json(result)
+            else:
+                st.json(mask_sensitive_data(result))
         
         return result
     else:
