@@ -1176,13 +1176,14 @@ def render_new_create_app_ui():
                                         ios_units = {}
                                         for slot_type, ad_format in [("rv", "REWARD"), ("is", "INTER"), ("bn", "BANNER")]:
                                             unit_name = generate_slot_name(
-                                                ios_bundle_id,
+                                                "",  # pkg_name is empty for iOS
                                                 "ios",
                                                 slot_type,
                                                 "applovin",
                                                 bundle_id=ios_bundle_id,
                                                 network_manager=network_manager,
-                                                app_name=app_name
+                                                app_name=app_name,
+                                                android_package_name=android_package if android_package else None
                                             ) or f"{app_name}_{ad_format.lower()}"
                                             ios_units[ad_format] = {
                                                 "name": unit_name,
@@ -1495,14 +1496,18 @@ def render_new_create_app_ui():
                                     st.text(f"**App ID:** {vungle_app_id}")
                                     
                                     # Get platform-specific package name/bundle ID
+                                    android_package = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                    
                                     if platform_value == "android":
-                                        pkg_name = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                        pkg_name = android_package
                                         bundle_id = ""
                                         platform_str_for_unit = "android"
+                                        android_package_for_unit = None  # Not needed for Android
                                     elif platform_value == "ios":
                                         pkg_name = ""
                                         bundle_id = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
                                         platform_str_for_unit = "ios"
+                                        android_package_for_unit = android_package if android_package else None  # Use Android package for iOS if available
                                     else:
                                         continue
                                     
@@ -1520,7 +1525,8 @@ def render_new_create_app_ui():
                                             network_key,
                                             bundle_id=bundle_id,
                                             network_manager=network_manager,
-                                            app_name=app_name
+                                            app_name=app_name,
+                                            android_package_name=android_package_for_unit
                                         )
                                         if slot_name:
                                             unit_names[slot_type.upper()] = slot_name

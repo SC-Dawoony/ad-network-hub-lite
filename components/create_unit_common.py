@@ -689,7 +689,9 @@ def render_create_unit_common_ui(
                 ios_ad_units = []
                 for slot_key in ["RV", "IS", "BN"]:
                     slot_type = slot_type_map.get(slot_key, slot_key.lower())
-                    slot_name = _generate_slot_name("", "ios", slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot)
+                    # For iOS: get Android package name if available (highest priority)
+                    android_package_name = app_info_to_use.get("pkgName", "") or app_info_to_use.get("androidPkgName", "")
+                    slot_name = _generate_slot_name("", "ios", slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot, android_package_name=android_package_name)
                     ios_ad_units.append({
                         "slot_key": slot_key,
                         "slot_name": slot_name,
@@ -1207,11 +1209,16 @@ def _render_ironsource_slot_ui(slot_key, slot_config, selected_app_code, app_inf
                 platform_str = app_info_to_use.get("platformStr", "android")
             
             app_name_for_slot = app_info_to_use.get("name", app_name)
+            # For iOS: get Android package name if available (highest priority)
+            android_package_name = None
+            if platform_str == "ios":
+                android_package_name = app_info_to_use.get("pkgName", "") or app_info_to_use.get("androidPkgName", "")
+            
             if bundle_id:
                 slot_type_map = {"RV": "rv", "IS": "is", "BN": "bn"}
                 slot_type = slot_type_map.get(slot_key, slot_key.lower())
                 # pkg_name is first param, bundle_id is separate param
-                default_name = _generate_slot_name("", platform_str, slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot)
+                default_name = _generate_slot_name("", platform_str, slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot, android_package_name=android_package_name)
                 st.session_state[slot_name_key] = default_name
                 st.session_state[auto_gen_flag_key] = True
             elif slot_name_key not in st.session_state:
@@ -1236,10 +1243,15 @@ def _render_ironsource_slot_ui(slot_key, slot_config, selected_app_code, app_inf
             if bundle_id:
                 platform_str = app_info_to_use.get("platformStr", "android")
                 app_name_for_slot = app_info_to_use.get("name", app_name)
+                # For iOS: get Android package name if available (highest priority)
+                android_package_name = None
+                if platform_str == "ios":
+                    android_package_name = app_info_to_use.get("pkgName", "") or app_info_to_use.get("androidPkgName", "")
+                
                 slot_type_map = {"RV": "rv", "IS": "is", "BN": "bn"}
                 slot_type = slot_type_map.get(slot_key, slot_key.lower())
                 # pkg_name is first param, bundle_id is separate param
-                expected_name = _generate_slot_name("", platform_str, slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot)
+                expected_name = _generate_slot_name("", platform_str, slot_type, "ironsource", store_url=None, bundle_id=bundle_id, network_manager=network_manager, app_name=app_name_for_slot, android_package_name=android_package_name)
                 if mediation_ad_unit_name != expected_name:
                     st.session_state[auto_gen_flag_key] = False
     

@@ -205,12 +205,14 @@ def get_bigoads_pkg_name_display(pkg_name: str, bundle_id: str, network_manager,
     return search_key.lower()
 
 
-def generate_slot_name(pkg_name: str, platform_str: str, slot_type: str, network: str = "bigoads", store_url: str = None, bundle_id: str = None, network_manager=None, app_name: str = None) -> str:
+def generate_slot_name(pkg_name: str, platform_str: str, slot_type: str, network: str = "bigoads", store_url: str = None, bundle_id: str = None, network_manager=None, app_name: str = None, android_package_name: str = None) -> str:
     """Generate unified slot name for all networks
     
     Format: {package_name_last_part}_{os}_{network}_{adtype}_bidding
     
     Rules:
+    - For iOS: If android_package_name is provided, use it (highest priority), otherwise use bundle_id
+    - For Android: Use pkg_name or bundle_id
     - package_name: Use BigOAds pkgNameDisplay if available, otherwise use current network's pkg_name/bundle_id
     - For iOS apps with iTunes ID (id123456), find Android version by app name and use its package name
     - Extract last part after "." (e.g., com.example.app -> app)
@@ -219,9 +221,17 @@ def generate_slot_name(pkg_name: str, platform_str: str, slot_type: str, network
     - adtype: "rv", "is", "bn" (unified for all networks)
     - Always append "_bidding"
     """
-    # Get package name (prefer BigOAds pkgNameDisplay)
-    # If pkg_name is empty, use bundle_id as fallback
-    source_pkg_name = pkg_name if pkg_name else (bundle_id if bundle_id else "")
+    # Normalize platform_str first
+    normalized_platform = normalize_platform_str(platform_str, network)
+    
+    # For iOS: prioritize android_package_name if provided
+    if normalized_platform == "ios" and android_package_name:
+        source_pkg_name = android_package_name
+    else:
+        # Get package name (prefer BigOAds pkgNameDisplay)
+        # If pkg_name is empty, use bundle_id as fallback
+        source_pkg_name = pkg_name if pkg_name else (bundle_id if bundle_id else "")
+    
     final_pkg_name = source_pkg_name
     
     # For Mintegral, skip BigOAds lookup (pkg_name should already be resolved from apps list)
