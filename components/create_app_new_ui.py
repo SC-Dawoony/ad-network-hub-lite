@@ -1553,26 +1553,44 @@ def render_new_create_app_ui():
                                                     if existing_placements:
                                                         deactivated_count = 0
                                                         for placement in existing_placements:
-                                                            placement_id = placement.get("id") or placement.get("placementId")
-                                                            if placement_id:
-                                                                try:
-                                                                    # Use VungleAPI to update placement status to inactive
-                                                                    if network_manager._vungle_api is None:
-                                                                        from utils.network_apis.vungle_api import VungleAPI
-                                                                        network_manager._vungle_api = VungleAPI()
+                                                            # Get placement_id from the placement object first
+                                                            initial_placement_id = placement.get("id") or placement.get("placementId")
+                                                            if not initial_placement_id:
+                                                                logger.warning(f"[Vungle] Placement ID not found in placement object: {placement}")
+                                                                continue
+                                                            
+                                                            try:
+                                                                # Use VungleAPI to get placement details first
+                                                                if network_manager._vungle_api is None:
+                                                                    from utils.network_apis.vungle_api import VungleAPI
+                                                                    network_manager._vungle_api = VungleAPI()
+                                                                
+                                                                # GET /placements/{id} to get full placement details
+                                                                get_response = network_manager._vungle_api.get_placement(str(initial_placement_id))
+                                                                
+                                                                if get_response and (get_response.get('status') == 0 or get_response.get('code') == 0):
+                                                                    # Extract id from GET placement response
+                                                                    placement_result = get_response.get('result', {})
+                                                                    placement_id = placement_result.get("id") or initial_placement_id
                                                                     
-                                                                    update_payload = {
-                                                                        "status": "inactive"
-                                                                    }
-                                                                    
-                                                                    update_response = network_manager._vungle_api.update_placement(str(placement_id), update_payload)
-                                                                    
-                                                                    if update_response and (update_response.get('status') == 0 or update_response.get('code') == 0):
-                                                                        deactivated_count += 1
+                                                                    if placement_id:
+                                                                        # Update placement status to inactive
+                                                                        update_payload = {
+                                                                            "status": "inactive"
+                                                                        }
+                                                                        
+                                                                        update_response = network_manager._vungle_api.update_placement(str(placement_id), update_payload)
+                                                                        
+                                                                        if update_response and (update_response.get('status') == 0 or update_response.get('code') == 0):
+                                                                            deactivated_count += 1
+                                                                        else:
+                                                                            logger.warning(f"[Vungle] Failed to deactivate placement {placement_id}: {update_response.get('msg', 'Unknown error') if update_response else 'No response'}")
                                                                     else:
-                                                                        logger.warning(f"[Vungle] Failed to deactivate placement {placement_id}: {update_response.get('msg', 'Unknown error')}")
-                                                                except Exception as e:
-                                                                    logger.warning(f"[Vungle] Error deactivating placement {placement_id}: {str(e)}")
+                                                                        logger.warning(f"[Vungle] Placement ID not found in GET response: {get_response}")
+                                                                else:
+                                                                    logger.warning(f"[Vungle] Failed to get placement {initial_placement_id}: {get_response.get('msg', 'Unknown error') if get_response else 'No response'}")
+                                                            except Exception as e:
+                                                                logger.warning(f"[Vungle] Error getting/deactivating placement {initial_placement_id}: {str(e)}")
                                                         
                                                         if deactivated_count > 0:
                                                             st.info(f"ℹ️ {deactivated_count}개 기존 placements를 inactive로 변경했습니다.")
