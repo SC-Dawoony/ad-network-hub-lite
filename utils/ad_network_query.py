@@ -1610,37 +1610,24 @@ def get_vungle_units(app_id: Optional[str] = None) -> List[Dict]:
     """Get placements (units) for a Vungle app
     
     Args:
-        app_id: Optional vungleAppId to filter by (if None, returns all placements)
+        app_id: Optional applicationId to filter by (if None, returns all placements)
+               Note: This should be the applicationId, not vungleAppId
     
     Returns:
         List of placement dicts
     """
     try:
-        placements = get_vungle_placements()
+        network_manager = get_network_manager()
         
         if app_id:
-            # Filter by vungleAppId from application object
-            filtered = []
-            for placement in placements:
-                # Parse application object (can be string or dict)
-                application = placement.get("application", {})
-                if isinstance(application, str):
-                    try:
-                        import json
-                        application = json.loads(application)
-                    except (json.JSONDecodeError, TypeError):
-                        logger.warning(f"[Vungle] Failed to parse application JSON in get_vungle_units: {application[:100]}")
-                        continue
-                
-                # Check vungleAppId
-                vungle_app_id = application.get("vungleAppId", "")
-                if str(vungle_app_id) == str(app_id):
-                    filtered.append(placement)
-            
-            logger.info(f"[Vungle] Filtered {len(filtered)} placements for app_id={app_id}")
-            return filtered
-        
-        return placements
+            # Use GET /placements?applicationId={appId} API
+            placements = network_manager._get_vungle_placements_by_app_id(app_id)
+            logger.info(f"[Vungle] Retrieved {len(placements)} placements for applicationId={app_id}")
+            return placements
+        else:
+            # If no app_id, get all placements
+            placements = get_vungle_placements()
+            return placements
     except Exception as e:
         logger.error(f"[Vungle] Error getting units: {str(e)}")
         import traceback

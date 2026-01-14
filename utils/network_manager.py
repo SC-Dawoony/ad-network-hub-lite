@@ -1826,6 +1826,162 @@ class MockNetworkManager:
             logger.error(f"[Vungle] Error requesting JWT token: {str(e)}")
             return None
     
+    def _get_vungle_applications(self) -> List[Dict]:
+        """Get applications from Vungle API
+        
+        API: GET https://publisher-api.vungle.com/api/v1/applications
+        
+        Returns:
+            List of application dicts
+        """
+        jwt_token = self._get_vungle_jwt_token()
+        if not jwt_token:
+            logger.error("[Vungle] Failed to get JWT token for applications")
+            return []
+        
+        base_url = "https://publisher-api.vungle.com/api/v1"
+        applications_url = f"{base_url}/applications"
+        
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info(f"[Vungle] Fetching applications from {applications_url}")
+        
+        try:
+            response = requests.get(applications_url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Parse response - can be list or dict
+                applications = []
+                if isinstance(result, list):
+                    applications = result
+                elif isinstance(result, dict):
+                    applications = result.get("data", result.get("applications", result.get("list", [])))
+                    if not isinstance(applications, list):
+                        applications = []
+                
+                # Filter by status: only return "active" applications
+                if applications:
+                    logger.info(f"[Vungle] Filtering applications by status=active (before: {len(applications)} applications)")
+                    active_applications = []
+                    for app in applications:
+                        app_status = app.get("status", "").lower() if isinstance(app.get("status"), str) else str(app.get("status", "")).lower()
+                        if app_status == "active":
+                            active_applications.append(app)
+                    applications = active_applications
+                    logger.info(f"[Vungle] Filtered to {len(applications)} active applications")
+                
+                logger.info(f"[Vungle] Retrieved {len(applications)} applications")
+                return applications
+            else:
+                logger.error(f"[Vungle] Failed to get applications: {response.status_code} - {response.text[:200]}")
+                if response.status_code == 401:
+                    logger.error("[Vungle] Authentication failed - JWT token may be expired")
+                elif response.status_code == 403:
+                    logger.error("[Vungle] Permission denied")
+                return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[Vungle] Error fetching applications: {str(e)}")
+            return []
+    
+    def _get_vungle_placements_by_app_id(self, app_id: str) -> List[Dict]:
+        """Get placements for a specific application from Vungle API
+        
+        API: GET https://publisher-api.vungle.com/api/v1/placements?applicationId={appId}
+        
+        Args:
+            app_id: Application ID (applicationId) to filter by
+        
+        Returns:
+            List of placement dicts for the specified application
+        """
+        jwt_token = self._get_vungle_jwt_token()
+        if not jwt_token:
+            logger.error("[Vungle] Failed to get JWT token for placements")
+            return []
+        
+        base_url = "https://publisher-api.vungle.com/api/v1"
+        placements_url = f"{base_url}/placements"
+        
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        params = {
+            "applicationId": app_id
+        }
+        
+        logger.info(f"[Vungle] Fetching placements for applicationId={app_id} from {placements_url}")
+        
+        try:
+            response = requests.get(placements_url, headers=headers, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Parse response - can be list or dict
+                placements = []
+                if isinstance(result, list):
+                    placements = result
+                elif isinstance(result, dict):
+                    placements = result.get("data", result.get("placements", result.get("list", [])))
+                    if not isinstance(placements, list):
+                        placements = []
+                
+                # Additional client-side filtering (in case API ignores query parameter)
+                if app_id and placements:
+                    logger.info(f"[Vungle] Filtering placements by applicationId={app_id} (before: {len(placements)} placements)")
+                    filtered_placements = []
+                    for placement in placements:
+                        app_info = placement.get("application", {})
+                        # Handle application as string (JSON) or dict
+                        if isinstance(app_info, str):
+                            try:
+                                import json
+                                app_info = json.loads(app_info)
+                            except (json.JSONDecodeError, TypeError):
+                                logger.warning(f"[Vungle] Failed to parse application JSON in filtering: {app_info[:100]}")
+                                continue
+                        
+                        if isinstance(app_info, dict):
+                            placement_app_id = app_info.get("id")
+                            # Compare as strings to handle both string and number types
+                            if str(placement_app_id) == str(app_id):
+                                filtered_placements.append(placement)
+                    placements = filtered_placements
+                    logger.info(f"[Vungle] Filtered to {len(placements)} placements for applicationId={app_id}")
+                
+                # Filter by status: only return "active" placements
+                if placements:
+                    logger.info(f"[Vungle] Filtering placements by status=active (before: {len(placements)} placements)")
+                    active_placements = []
+                    for placement in placements:
+                        placement_status = placement.get("status", "").lower() if isinstance(placement.get("status"), str) else str(placement.get("status", "")).lower()
+                        if placement_status == "active":
+                            active_placements.append(placement)
+                    placements = active_placements
+                    logger.info(f"[Vungle] Filtered to {len(placements)} active placements")
+                
+                logger.info(f"[Vungle] Retrieved {len(placements)} placements for applicationId={app_id}")
+                return placements
+            else:
+                logger.error(f"[Vungle] Failed to get placements: {response.status_code} - {response.text[:200]}")
+                if response.status_code == 401:
+                    logger.error("[Vungle] Authentication failed - JWT token may be expired")
+                elif response.status_code == 403:
+                    logger.error("[Vungle] Permission denied")
+                return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[Vungle] Error fetching placements: {str(e)}")
+            return []
+    
     def _get_vungle_placements(self) -> List[Dict]:
         """Get all placements from Vungle API
         
@@ -1864,6 +2020,17 @@ class MockNetworkManager:
                     placements = result.get("data", result.get("placements", result.get("list", [])))
                     if not isinstance(placements, list):
                         placements = []
+                
+                # Filter by status: only return "active" placements
+                if placements:
+                    logger.info(f"[Vungle] Filtering placements by status=active (before: {len(placements)} placements)")
+                    active_placements = []
+                    for placement in placements:
+                        placement_status = placement.get("status", "").lower() if isinstance(placement.get("status"), str) else str(placement.get("status", "")).lower()
+                        if placement_status == "active":
+                            active_placements.append(placement)
+                    placements = active_placements
+                    logger.info(f"[Vungle] Filtered to {len(placements)} active placements")
                 
                 logger.info(f"[Vungle] Retrieved {len(placements)} placements")
                 return placements
@@ -1928,21 +2095,34 @@ class MockNetworkManager:
                 self._fyber_api = FyberAPI()
             return self._fyber_api.get_apps(app_key=app_key)
         elif network == "vungle":
-            # For Vungle, placements contain both app and unit info
-            # Extract unique apps from placements
-            placements = self._get_vungle_placements()
-            apps_dict = {}
-            for placement in placements:
-                app_id = placement.get("applicationId")
-                if app_id and app_id not in apps_dict:
-                    apps_dict[app_id] = {
-                        "appId": app_id,
-                        "name": placement.get("applicationName", ""),
-                        "platform": placement.get("platform", ""),
-                        "packageName": placement.get("packageName", ""),
-                        "bundleId": placement.get("bundleId", "")
-                    }
-            return list(apps_dict.values())
+            # Use GET /applications API to get applications list
+            applications = self._get_vungle_applications()
+            if not applications:
+                return []
+            
+            # Convert to standard format
+            formatted_apps = []
+            for app in applications:
+                if isinstance(app, dict):
+                    # Extract app info from application object
+                    vungle_app_id = app.get("vungleAppId") or app.get("id", "")
+                    app_name = app.get("name", "")
+                    app_platform = app.get("platform", "")
+                    store = app.get("store", {})
+                    store_id = store.get("id", "") if isinstance(store, dict) else ""
+                    
+                    formatted_apps.append({
+                        "appId": vungle_app_id,
+                        "vungleAppId": app.get("vungleAppId", ""),
+                        "applicationId": app.get("id", ""),
+                        "name": app_name,
+                        "platform": app_platform,
+                        "packageName": store_id,  # Store ID is package name for Android
+                        "bundleId": store_id,  # Store ID is bundle ID for iOS
+                        "storeId": store_id
+                    })
+            
+            return formatted_apps
         elif network == "unity":
             # Use new UnityAPI
             if self._unity_api is None:

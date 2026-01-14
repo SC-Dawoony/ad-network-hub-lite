@@ -2278,8 +2278,8 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                             # BigOAds uses slotCode for ad_unit_id
                                             unit_id = matched_unit.get("slotCode") or matched_unit.get("id") or ""
                                         elif actual_network == "vungle":
-                                            # Vungle uses referenceID for ad_unit_id
-                                            unit_id = matched_unit.get("referenceID") or matched_unit.get("placementId") or matched_unit.get("id") or ""
+                                            # Vungle uses referenceID as primary identifier for ad_unit_id
+                                            unit_id = matched_unit.get("referenceID") or matched_unit.get("id") or matched_unit.get("placementId") or ""
                                         elif actual_network == "unity":
                                             # Unity uses ad unit's id or adUnitId field for ad_unit_id
                                             # Unity API returns ad units with id field (the ad unit ID itself)
