@@ -845,6 +845,411 @@ def render_new_create_app_ui():
                     st.markdown("### 5️⃣ Create Unit")
                     st.markdown("생성된 앱에 Ad Unit을 추가로 생성할 수 있습니다.")
                     
+                    # Add "Create All Units" button at the top
+                    st.markdown("#### 🚀 전체 네트워크 Ad Unit 일괄 생성")
+                    st.info("💡 모든 네트워크의 모든 Ad Unit (RV, IS, BN)을 한번에 생성합니다.")
+                    
+                    if st.button(
+                        "✅ Create All Units for All Networks (RV, IS, BN)",
+                        key="create_all_units_all_networks",
+                        use_container_width=True,
+                        type="primary"
+                    ):
+                        # Collect all units to create from all networks
+                        all_units_to_create = []
+                        
+                        # Iterate through all created apps
+                        for network_key, app_data in created_apps_by_network.items():
+                            network_display = get_network_display_names().get(network_key, network_key.title())
+                            config = get_network_config(network_key)
+                            
+                            if not config:
+                                continue
+                            
+                            # Get mapped_params from preview_data if not in app_data
+                            mapped_params = app_data.get("mapped_params", {})
+                            if not mapped_params:
+                                preview_info = preview_data.get(network_key, {})
+                                mapped_params = preview_info.get("params", {})
+                            
+                            # Extract app info for this network
+                            app_info = extract_app_info_from_response(network_key, app_data.get("response"), mapped_params)
+                            
+                            if not app_info:
+                                continue
+                            
+                            app_name = app_info.get("name", "Unknown")
+                            app_code = app_info.get("appCode") or app_info.get("appId") or app_info.get("appKey")
+                            
+                            if not app_code:
+                                continue
+                            
+                            # Handle special cases (Vungle, Unity, IronSource, AppLovin, Pangle)
+                            if network_key == "vungle" and app_data.get("results"):
+                                # Vungle: handle each platform separately
+                                results_list = app_data.get("results", [])
+                                preview_info = preview_data.get(network_key, {})
+                                mapped_params = preview_info.get("params", {})
+                                
+                                for platform, result, response in results_list:
+                                    result_data = response.get("result", {}) if isinstance(response.get("result"), dict) else response
+                                    vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+                                    platform_value = result_data.get("platform", "").lower()
+                                    
+                                    android_package = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                    
+                                    if platform_value == "android":
+                                        pkg_name = android_package
+                                        bundle_id = ""
+                                        platform_str_for_unit = "android"
+                                        android_package_for_unit = None
+                                    elif platform_value == "ios":
+                                        pkg_name = ""
+                                        bundle_id = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
+                                        platform_str_for_unit = "ios"
+                                        android_package_for_unit = android_package if android_package else None
+                                    else:
+                                        continue
+                                    
+                                    # Generate unit names
+                                    from components.create_app_helpers import generate_slot_name
+                                    network_manager = get_network_manager()
+                                    
+                                    for slot_type in ["rv", "is", "bn"]:
+                                        slot_name = generate_slot_name(
+                                            pkg_name,
+                                            platform_str_for_unit,
+                                            slot_type,
+                                            network_key,
+                                            bundle_id=bundle_id,
+                                            network_manager=network_manager,
+                                            app_name=app_name,
+                                            android_package_name=android_package_for_unit
+                                        )
+                                        
+                                        if slot_name:
+                                            all_units_to_create.append({
+                                                "network": network_key,
+                                                "network_display": network_display,
+                                                "app_info": {
+                                                    "vungleAppId": vungle_app_id,
+                                                    "platform": platform_value,
+                                                    "name": app_name
+                                                },
+                                                "slot_type": slot_type,
+                                                "slot_name": slot_name,
+                                                "platform_str": platform_str_for_unit
+                                            })
+                            elif network_key in ["applovin", "pangle"]:
+                                # AppLovin and Pangle: handled separately in their sections
+                                # But we can still create units if app_info is available
+                                if app_info:
+                                    platform_str = app_info.get("platformStr", "android")
+                                    pkg_name = app_info.get("pkgName", "")
+                                    bundle_id = app_info.get("bundleId", "")
+                                    
+                                    # For AppLovin, get from app_info
+                                    if network_key == "applovin":
+                                        android_package = app_info.get("android_package", "")
+                                        ios_bundle_id = app_info.get("ios_bundle_id", "")
+                                        
+                                        # Generate for Android
+                                        if android_package:
+                                            from components.create_app_helpers import generate_slot_name
+                                            network_manager = get_network_manager()
+                                            
+                                            for slot_type in ["rv", "is", "bn"]:
+                                                slot_name = generate_slot_name(
+                                                    android_package,
+                                                    "android",
+                                                    slot_type,
+                                                    network_key,
+                                                    network_manager=network_manager,
+                                                    app_name=app_name
+                                                )
+                                                
+                                                if slot_name:
+                                                    all_units_to_create.append({
+                                                        "network": network_key,
+                                                        "network_display": network_display,
+                                                        "app_info": {
+                                                            **app_info,
+                                                            "package_name": android_package,
+                                                            "platform": "android"
+                                                        },
+                                                        "slot_type": slot_type,
+                                                        "slot_name": slot_name,
+                                                        "platform_str": "android"
+                                                    })
+                                        
+                                        # Generate for iOS
+                                        if ios_bundle_id:
+                                            from components.create_app_helpers import generate_slot_name
+                                            network_manager = get_network_manager()
+                                            
+                                            for slot_type in ["rv", "is", "bn"]:
+                                                slot_name = generate_slot_name(
+                                                    "",
+                                                    "ios",
+                                                    slot_type,
+                                                    network_key,
+                                                    bundle_id=ios_bundle_id,
+                                                    network_manager=network_manager,
+                                                    app_name=app_name,
+                                                    android_package_name=android_package if android_package else None
+                                                )
+                                                
+                                                if slot_name:
+                                                    all_units_to_create.append({
+                                                        "network": network_key,
+                                                        "network_display": network_display,
+                                                        "app_info": {
+                                                            **app_info,
+                                                            "bundleId": ios_bundle_id,
+                                                            "platform": "ios"
+                                                        },
+                                                        "slot_type": slot_type,
+                                                        "slot_name": slot_name,
+                                                        "platform_str": "ios"
+                                                    })
+                                continue
+                            elif app_data.get("results"):
+                                # Multi-platform networks (IronSource, Pangle, etc.): handle each platform separately
+                                results_list = app_data.get("results", [])
+                                preview_info = preview_data.get(network_key, {})
+                                mapped_params = preview_info.get("params", {})
+                                
+                                for platform, result, response in results_list:
+                                    # Extract app info for this specific platform
+                                    platform_app_info = extract_app_info_from_response(network_key, response, mapped_params)
+                                    
+                                    if not platform_app_info:
+                                        continue
+                                    
+                                    # Determine platform
+                                    platform_value = platform.lower() if isinstance(platform, str) else "android"
+                                    platform_str = "android" if platform_value == "android" else "ios"
+                                    
+                                    # Get platform-specific package name and bundle ID
+                                    android_package = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                    
+                                    if platform_str == "android":
+                                        pkg_name = platform_app_info.get("pkgName", "") or android_package
+                                        bundle_id = ""
+                                        android_package_for_unit = None
+                                    else:
+                                        pkg_name = ""
+                                        bundle_id = platform_app_info.get("bundleId", "") or mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
+                                        android_package_for_unit = android_package if android_package else None
+                                    
+                                    # Generate unit names
+                                    from components.create_app_helpers import generate_slot_name
+                                    network_manager = get_network_manager()
+                                    
+                                    for slot_type in ["rv", "is", "bn"]:
+                                        slot_name = generate_slot_name(
+                                            pkg_name,
+                                            platform_str,
+                                            slot_type,
+                                            network_key,
+                                            bundle_id=bundle_id,
+                                            network_manager=network_manager,
+                                            app_name=app_name,
+                                            android_package_name=android_package_for_unit
+                                        )
+                                        
+                                        if slot_name:
+                                            all_units_to_create.append({
+                                                "network": network_key,
+                                                "network_display": network_display,
+                                                "app_info": {
+                                                    **platform_app_info,
+                                                    "platform": platform_value,
+                                                    "name": app_name
+                                                },
+                                                "slot_type": slot_type,
+                                                "slot_name": slot_name,
+                                                "platform_str": platform_str
+                                            })
+                            else:
+                                # Single-platform networks: create RV, IS, BN
+                                platform_str = app_info.get("platformStr", "android")
+                                
+                                # Get package name and bundle ID
+                                pkg_name = app_info.get("pkgName", "")
+                                bundle_id = app_info.get("bundleId", "")
+                                
+                                # For iOS, check if Android package is available
+                                android_package_for_unit = None
+                                if platform_str == "ios":
+                                    preview_info = preview_data.get(network_key, {})
+                                    mapped_params = preview_info.get("params", {})
+                                    android_package_for_unit = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                
+                                # Generate unit names
+                                from components.create_app_helpers import generate_slot_name
+                                network_manager = get_network_manager()
+                                
+                                for slot_type in ["rv", "is", "bn"]:
+                                    slot_name = generate_slot_name(
+                                        pkg_name,
+                                        platform_str,
+                                        slot_type,
+                                        network_key,
+                                        bundle_id=bundle_id,
+                                        network_manager=network_manager,
+                                        app_name=app_name,
+                                        android_package_name=android_package_for_unit
+                                    )
+                                    
+                                    if slot_name:
+                                        all_units_to_create.append({
+                                            "network": network_key,
+                                            "network_display": network_display,
+                                            "app_info": app_info,
+                                            "slot_type": slot_type,
+                                            "slot_name": slot_name,
+                                            "platform_str": platform_str
+                                        })
+                        
+                        # Create all units
+                        if all_units_to_create:
+                            total_units = len(all_units_to_create)
+                            success_count = 0
+                            failure_count = 0
+                            
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+                            
+                            for idx, unit_info in enumerate(all_units_to_create):
+                                network_key = unit_info["network"]
+                                network_display = unit_info["network_display"]
+                                app_info = unit_info["app_info"]
+                                slot_type = unit_info["slot_type"]
+                                slot_name = unit_info["slot_name"]
+                                platform_str = unit_info["platform_str"]
+                                
+                                progress = (idx + 1) / total_units
+                                progress_bar.progress(progress)
+                                status_text.text(f"생성 중: {network_display} - {slot_type.upper()} ({idx + 1}/{total_units})")
+                                
+                                try:
+                                    network_manager = get_network_manager()
+                                    config = get_network_config(network_key)
+                                    
+                                    if network_key == "vungle":
+                                        # Vungle: use create_unit with special handling
+                                        vungle_app_id = app_info.get("vungleAppId")
+                                        platform_value = app_info.get("platform", "")
+                                        
+                                        # Deactivate existing placements first
+                                        if vungle_app_id:
+                                            try:
+                                                existing_placements = network_manager._get_vungle_placements_by_app_id(str(vungle_app_id))
+                                                for placement in existing_placements:
+                                                    initial_placement_id = placement.get("id")
+                                                    if initial_placement_id:
+                                                        # Get full placement details to get accurate ID
+                                                        placement_details = network_manager._vungle_api.get_placement(str(initial_placement_id))
+                                                        if placement_details and placement_details.get("result"):
+                                                            placement_id = placement_details["result"].get("id")
+                                                            if placement_id:
+                                                                network_manager._vungle_api.update_placement(str(placement_id), {"status": "inactive"})
+                                            except Exception as e:
+                                                logger.warning(f"[Vungle] Failed to deactivate existing placements: {str(e)}")
+                                        
+                                        # Create unit payload
+                                        unit_payload = config.build_unit_payload(
+                                            app_id=str(vungle_app_id),
+                                            unit_name=slot_name,
+                                            ad_type=slot_type,
+                                            platform=platform_value
+                                        )
+                                        
+                                        response = network_manager.create_unit(network_key, unit_payload)
+                                    elif network_key == "applovin":
+                                        # AppLovin: use create_unit with special payload
+                                        ad_format_map = {"rv": "REWARD", "is": "INTER", "bn": "BANNER"}
+                                        ad_format = ad_format_map.get(slot_type.lower(), "REWARD")
+                                        
+                                        unit_payload = {
+                                            "name": slot_name,
+                                            "platform": platform_str,
+                                            "ad_format": ad_format
+                                        }
+                                        
+                                        if platform_str == "android":
+                                            unit_payload["package_name"] = app_info.get("package_name", "")
+                                        else:
+                                            unit_payload["bundle_id"] = app_info.get("bundleId", "")
+                                        
+                                        response = network_manager.create_unit(network_key, unit_payload)
+                                    else:
+                                        # Standard networks: use create_default_slot
+                                        from components.create_app_helpers import create_default_slot
+                                        create_default_slot(
+                                            network_key,
+                                            app_info,
+                                            slot_type,
+                                            network_manager,
+                                            config
+                                        )
+                                        response = {"status": 0}  # Assume success if no exception
+                                    
+                                    success_count += 1
+                                    
+                                    # Track unit creation result
+                                    platform_display = "Android" if platform_str.lower() == "android" else "iOS"
+                                    if network_key not in st.session_state.creation_results:
+                                        st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                    st.session_state.creation_results[network_key]["units"].append({
+                                        "platform": platform_display,
+                                        "app_name": app_info.get("name", "Unknown"),
+                                        "unit_name": slot_name,
+                                        "unit_type": slot_type.upper(),
+                                        "success": True
+                                    })
+                                    
+                                except Exception as e:
+                                    failure_count += 1
+                                    
+                                    # Track unit creation failure
+                                    platform_display = "Android" if platform_str.lower() == "android" else "iOS"
+                                    if network_key not in st.session_state.creation_results:
+                                        st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                    st.session_state.creation_results[network_key]["units"].append({
+                                        "platform": platform_display,
+                                        "app_name": app_info.get("name", "Unknown"),
+                                        "unit_name": slot_name,
+                                        "unit_type": slot_type.upper(),
+                                        "success": False,
+                                        "error": str(e)
+                                    })
+                                    
+                                    logger.error(f"Error creating {slot_type} unit for {network_key}: {str(e)}", exc_info=True)
+                            
+                            progress_bar.empty()
+                            status_text.empty()
+                            
+                            # Show summary
+                            if success_count == total_units:
+                                st.balloons()
+                                st.success(f"🎉 모든 Ad Unit 생성 완료! ({success_count}/{total_units})")
+                            elif success_count > 0:
+                                st.warning(f"⚠️ {success_count}/{total_units}개 Ad Unit 생성 완료, {failure_count}개 실패")
+                            else:
+                                st.error(f"❌ 모든 Ad Unit 생성 실패 ({failure_count}/{total_units})")
+                            
+                            # Force rerun to update UI
+                            st.rerun()
+                        else:
+                            st.warning("⚠️ 생성할 Ad Unit이 없습니다. 먼저 App을 생성해주세요.")
+                    
+                    st.divider()
+                    
+                    # Get preview_data from session state
+                    preview_data = st.session_state.get("preview_data", {})
+                    
                     # Helper function to extract app info from response
                     def extract_app_info_from_response(network_key, response, mapped_params):
                         """Extract app info (appId, appCode, gameId, etc.) from create app response"""
