@@ -1009,6 +1009,66 @@ def find_matching_unit(
             logger.warning(f"[Unity] No matching units found for format '{target_format}' (target_format={target_format.lower()})")
             return None
     
+    # For Pangle, match by adType (numeric)
+    if network == "pangle":
+        # Pangle uses adType field (2: Banner, 5: Rewarded Video, 6: Interstitial)
+        matching_units = []
+        target_ad_type = target_format  # target_format is already the numeric adType from map_ad_format_to_network_format
+        logger.info(f"[Pangle] Finding unit: ad_format={ad_format}, target_format={target_format}, target_ad_type={target_ad_type} (type: {type(target_ad_type)})")
+        logger.info(f"[Pangle] Total units to check: {len(network_units)}")
+        
+        # Debug: Log all units' adType values
+        for idx, unit in enumerate(network_units):
+            unit_ad_type = unit.get("adType")
+            unit_name = unit.get("name", "N/A")
+            unit_slot_code = unit.get("slotCode") or unit.get("adSlotId", "N/A")
+            logger.info(f"[Pangle] Unit[{idx}]: name={unit_name}, slotCode={unit_slot_code}, adType={unit_ad_type} (type: {type(unit_ad_type)}), all_keys={list(unit.keys())}")
+        
+        for unit in network_units:
+            unit_ad_type = unit.get("adType")
+            unit_name = unit.get("name", "N/A")
+            
+            # Check if adType field exists
+            if unit_ad_type is None:
+                logger.warning(f"[Pangle] Unit '{unit_name}' has no 'adType' field. Available keys: {list(unit.keys())}")
+                continue
+            
+            logger.info(f"[Pangle] Checking unit: name={unit_name}, adType={unit_ad_type} (type: {type(unit_ad_type)})")
+            # Compare as integers if possible
+            try:
+                unit_ad_type_int = int(unit_ad_type)
+                target_ad_type_int = int(target_ad_type)
+                if unit_ad_type_int == target_ad_type_int:
+                    logger.info(f"[Pangle] ✓ Match found: {unit_name} (adType={unit_ad_type_int} == target={target_ad_type_int})")
+                    matching_units.append(unit)
+                else:
+                    logger.info(f"[Pangle] ✗ No match: {unit_name} (adType={unit_ad_type_int} != target={target_ad_type_int})")
+            except (ValueError, TypeError) as e:
+                # If conversion fails, skip
+                logger.warning(f"[Pangle] Cannot compare adType: {unit_name}, adType={unit_ad_type}, error={e}")
+                continue
+        
+        logger.info(f"[Pangle] Total matching units found: {len(matching_units)}")
+        
+        # If multiple matches and platform is provided, prioritize by platform indicator in name
+        if len(matching_units) > 1 and platform:
+            platform_normalized = platform.lower()
+            platform_indicator = "_aos_" if platform_normalized == "android" else "_ios_"
+            
+            for unit in matching_units:
+                slot_name = unit.get("name", "").lower()
+                if platform_indicator in slot_name:
+                    logger.info(f"[Pangle] Found unit with platform indicator '{platform_indicator}' in name: {unit.get('name')}")
+                    return unit
+            
+            # If no unit has platform indicator, return first match
+            logger.warning(f"[Pangle] Multiple units found for format '{target_format}' but none have platform indicator '{platform_indicator}' in name")
+            return matching_units[0] if matching_units else None
+        elif len(matching_units) == 1:
+            return matching_units[0]
+        else:
+            return None
+    
     # For other networks or when platform is not provided, use simple format matching
     for unit in network_units:
         unit_format = unit.get("adFormat", "").lower()
@@ -1605,14 +1665,27 @@ def get_unity_units(project_id: str) -> List[Dict]:
             logger.warning(f"[Unity] No ad units found for project {project_id}")
             return []
         
-        # Unity returns { "apple": [...], "google": [...] }
+        # Unity returns { "apple": {...}, "google": {...} }
+        # Each platform value can be either a dict (keyed by ad unit ID) or a list
         # Flatten to a single list with platform info
         units = []
         for platform, platform_units in ad_units_dict.items():
-            if isinstance(platform_units, list):
+            if isinstance(platform_units, dict):
+                # Dict format: {"Interstitial_iOS": {...}, "Rewarded_iOS": {...}, ...}
+                for ad_unit_id, unit in platform_units.items():
+                    # Add platform info and ad_unit_id key to each unit
+                    unit_with_platform = unit.copy() if isinstance(unit, dict) else {}
+                    unit_with_platform["platform"] = platform  # "apple" or "google"
+                    unit_with_platform["adUnitId"] = ad_unit_id  # Store the ad unit ID key
+                    # Also ensure id field exists
+                    if "id" not in unit_with_platform:
+                        unit_with_platform["id"] = ad_unit_id
+                    units.append(unit_with_platform)
+            elif isinstance(platform_units, list):
+                # List format: [{...}, {...}, ...]
                 for unit in platform_units:
                     # Add platform info to each unit
-                    unit_with_platform = unit.copy()
+                    unit_with_platform = unit.copy() if isinstance(unit, dict) else {}
                     unit_with_platform["platform"] = platform  # "apple" or "google"
                     units.append(unit_with_platform)
         
@@ -1629,8 +1702,8 @@ def get_network_units(network: str, app_code: str) -> List[Dict]:
     """Get ad units for a network app
     
     Args:
-        network: Network name (e.g., "ironsource", "bigoads", "inmobi", "mintegral", "fyber", "vungle", "unity")
-        app_code: App code (appKey for IronSource, appId for InMobi/Mintegral/Fyber/Vungle, appCode for BigOAds, projectId for Unity, etc.)
+        network: Network name (e.g., "ironsource", "bigoads", "inmobi", "mintegral", "fyber", "vungle", "unity", "pangle")
+        app_code: App code (appKey for IronSource, appId for InMobi/Mintegral/Fyber/Vungle/Pangle, appCode for BigOAds, projectId for Unity, etc.)
     
     Returns:
         List of ad unit dicts
@@ -1650,6 +1723,10 @@ def get_network_units(network: str, app_code: str) -> List[Dict]:
         return get_vungle_units(app_code)
     elif network == "unity":
         return get_unity_units(app_code)  # app_code is projectId for Unity
+    elif network == "pangle":
+        # Use network_manager.get_units for Pangle
+        network_manager = get_network_manager()
+        return network_manager.get_units("pangle", app_code)
     
     logger.warning(f"[{network}] get_network_units not implemented yet")
     return []
@@ -1671,6 +1748,7 @@ def map_applovin_network_to_actual_network(applovin_network: str) -> Optional[st
         "FYBER_BIDDING": "fyber",
         "MINTEGRAL_BIDDING": "mintegral",
         "PANGLE_BIDDING": "pangle",
+        "TIKTOK_BIDDING": "pangle",  # TIKTOK_BIDDING is also Pangle
         "VUNGLE_BIDDING": "vungle",
         "UNITY_BIDDING": "unity",
         # Add more mappings as needed
@@ -1746,6 +1824,14 @@ def map_ad_format_to_network_format(ad_format: str, network: str) -> str:
             "BANNER": "Banner"
         }
         return format_map.get(ad_format_upper, ad_format.capitalize())
+    elif network == "pangle":
+        # Pangle: ad_slot_type numbers (2: Banner, 5: Rewarded Video, 6: Interstitial)
+        format_map = {
+            "REWARD": 5,  # Rewarded Video
+            "INTER": 6,   # Interstitial
+            "BANNER": 2   # Banner
+        }
+        return format_map.get(ad_format_upper, ad_format.lower())
     
     # Default: return lowercase
     return ad_format.lower()

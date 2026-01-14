@@ -87,15 +87,23 @@ def map_store_info_to_network_params(
         params["coppa"] = "false"  # Default: Not child-directed
     
     elif network == "pangle":
-        params["app_name"] = app_name or ""
-        # Pangle uses download_url (single field per platform)
-        # Store both platform URLs for multi-platform support
+        # Pangle uses platform-specific app names
+        # Store both platform app names and URLs for multi-platform support
         if ios_info:
+            params["iosAppName"] = ios_info.get("name", "")
             params["iosDownloadUrl"] = f"https://apps.apple.com/us/app/id{ios_info.get('app_id')}"
         if android_info:
+            params["androidAppName"] = android_info.get("name", "")
             params["androidDownloadUrl"] = f"https://play.google.com/store/apps/details?id={android_info.get('package_name')}"
-        # Default category (user may need to adjust)
-        params["app_category_code"] = 121344  # Games-Others (default)
+        # Fallback to common app_name if platform-specific names not available
+        params["app_name"] = app_name or ""
+        # Note: user_id and role_id are NOT included in params
+        # They will be added by pangle_api.py from environment variables
+        # This ensures consistency and prevents params from overriding .env values
+        # Match app_category_code from iOS and Android categories
+        ios_category = ios_info.get("category", "") if ios_info else None
+        android_category = android_info.get("category", "") if android_info else None
+        params["app_category_code"] = config.match_category_code(ios_category, android_category)
         params["coppa_value"] = 0  # Default: For users aged 13 and above
     
     elif network == "mintegral":
@@ -800,6 +808,9 @@ def render_new_create_app_ui():
                 # AppLovin doesn't require app creation, so show Create Unit section if selected
                 show_create_unit = success_count > 0 or "applovin" in selected_networks
                 
+                # Initialize created_apps_by_network outside the if block to avoid UnboundLocalError
+                created_apps_by_network = {}
+                
                 if show_create_unit:
                     st.divider()
                     st.markdown("### 5️⃣ Create Unit")
@@ -876,7 +887,6 @@ def render_new_create_app_ui():
                     
                     # Get successfully created apps from session state and responses
                     # For multi-platform networks, we need to check results list
-                    created_apps_by_network = {}
                     for network_key in selected_networks:
                         # First try SessionManager
                         last_app_info = SessionManager.get_last_created_app_info(network_key)

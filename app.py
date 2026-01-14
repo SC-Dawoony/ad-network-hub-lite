@@ -75,14 +75,8 @@ with st.sidebar:
     # Quick actions
     st.subheader("Quick Actions")
     
-    if st.button("📱 Create App", use_container_width=True):
-        switch_to_page("1_Create_App.py")
-    
     if st.button("🎯 Create Unit", use_container_width=True):
         switch_to_page(".hidden_Create_Unit.py")
-    
-    if st.button("📋 View Lists", use_container_width=True):
-        switch_to_page("3_View_Lists.py")
     
     if st.button("⚙️ Update Ad Unit", use_container_width=True):
         switch_to_page("4_Update_Ad_Unit.py")

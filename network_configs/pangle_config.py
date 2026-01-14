@@ -1,7 +1,10 @@
 """Pangle (TikTok) network configuration"""
 from typing import Dict, List, Tuple, Optional
+from collections import OrderedDict
 from .base_config import NetworkConfig, Field, ConditionalField
 from utils.session_manager import SessionManager
+from utils.helpers import get_env_var
+from utils.helpers import get_env_var
 
 
 class PangleConfig(NetworkConfig):
@@ -45,6 +48,92 @@ class PangleConfig(NetworkConfig):
             ("Games-Card (121343)", 121343),
             ("Games-Others (121344)", 121344),
         ]
+    
+    def match_category_code(self, ios_category: Optional[str] = None, android_category: Optional[str] = None) -> int:
+        """Match iOS and Android categories to Pangle app_category_code
+        
+        Args:
+            ios_category: iOS app category (e.g., "Games", "Action", "Puzzle")
+            android_category: Android app category (e.g., "GAME_ACTION", "GAME_PUZZLE")
+            
+        Returns:
+            Pangle app_category_code (default: 121344 - Games-Others)
+        """
+        # Combine both categories for matching
+        combined_category = ""
+        if ios_category:
+            combined_category += ios_category.lower() + " "
+        if android_category:
+            combined_category += android_category.lower()
+        combined_category = combined_category.strip()
+        
+        if not combined_category:
+            return 121344  # Default: Games-Others
+        
+        # Category mapping: keyword -> category_code
+        category_mapping = {
+            # Action
+            "action": 121327,  # Games-Action Game
+            # Puzzle
+            "puzzle": 121333,  # Games-Puzzle Game
+            # Racing
+            "racing": 121324,  # Games-Racing Game
+            # Sports
+            "sports": 121325,  # Games-Sports Game
+            # Music
+            "music": 121334,  # Games-Music Game
+            # Adventure
+            "adventure": 121341,  # Games-Adventure
+            # Role Playing / RPG
+            "role": 121319,  # Games-Role Playing Game
+            "rpg": 121319,  # Games-Role Playing Game
+            "playing": 121319,  # Games-Role Playing Game
+            # Strategy
+            "strategy": 121320,  # Games-Hardcore-Strategy Game
+            "tower": 121328,  # Games-Strategy Tower Defense Game
+            "defense": 121328,  # Games-Strategy Tower Defense Game
+            # Shooting
+            "shooting": 121323,  # Games-Shooting Game
+            "shooter": 121323,  # Games-Shooting Game
+            # Simulation
+            "simulation": 121326,  # Games-Simulation Game
+            "sim": 121326,  # Games-Simulation Game
+            # Social
+            "social": 121322,  # Games-Social Game
+            # Card
+            "card": 121343,  # Games-Card
+            "cards": 121343,  # Games-Card
+            # Casual
+            "casual": 121336,  # Games-Casual-Card Game
+            # Arcade
+            "arcade": 121335,  # Games-Arcade Runner
+            "runner": 121335,  # Games-Arcade Runner
+            # Match 3
+            "match": 121330,  # Games-Match 3
+            "match3": 121330,  # Games-Match 3
+            # Merge
+            "merge": 121329,  # Games-Merge Game
+            # Idle
+            "idle": 121331,  # Games-Idle Game
+            # Quiz
+            "quiz": 121332,  # Games-Quiz Game
+            # Word
+            "word": 121337,  # Games-Word
+            # MOBA
+            "moba": 121339,  # Games-MOBA
+            # Sandbox
+            "sandbox": 121342,  # Games-Sandbox
+            # Game Center
+            "center": 121315,  # Games-Game Center
+        }
+        
+        # Try to match keywords in combined category
+        for keyword, code in category_mapping.items():
+            if keyword in combined_category:
+                return code
+        
+        # If no match found, return default
+        return 121344  # Games-Others
     
     def get_app_creation_fields(self) -> List[Field]:
         """Get fields for app creation - all required fields shown"""
@@ -233,46 +322,71 @@ class PangleConfig(NetworkConfig):
         will be added by network_manager automatically
         user_id and role_id are included from form_data (set from .env in Create App page)
         """
-        # Determine download_url based on platform parameter
+        # Determine download_url and app_name based on platform parameter
         download_url = None
+        app_name = None
         if platform == "Android":
             download_url = form_data.get("androidDownloadUrl", "").strip()
+            app_name = form_data.get("androidAppName") or form_data.get("app_name", "")
         elif platform == "iOS":
             download_url = form_data.get("iosDownloadUrl", "").strip()
+            app_name = form_data.get("iosAppName") or form_data.get("app_name", "")
         else:
-            # Legacy: use download_url if provided (backward compatibility)
+            # Legacy: use download_url and app_name if provided (backward compatibility)
             download_url = form_data.get("download_url", "").strip()
+            app_name = form_data.get("app_name", "")
 
-        payload = {
-            "app_name": form_data.get("app_name"),
-            "download_url": download_url,
-            "app_category_code": form_data.get("app_category_code"),
-        }
+        # Build payload in specific order as requested
+        # Get user_id and role_id from environment (Streamlit secrets first, then .env)
+        # This ensures Streamlit secrets take priority in deployed environments
+        user_id = get_env_var("PANGLE_USER_ID")
+        role_id = get_env_var("PANGLE_ROLE_ID")
         
-        # Include user_id and role_id if present (from .env, shown as read-only in form)
-        if form_data.get("user_id"):
-            payload["user_id"] = form_data.get("user_id")
-        if form_data.get("role_id"):
-            payload["role_id"] = form_data.get("role_id")
+        # Convert to int if they are strings
+        user_id_int = None
+        role_id_int = None
+        if user_id:
+            try:
+                user_id_int = int(user_id)
+            except (ValueError, TypeError):
+                pass
+        if role_id:
+            try:
+                role_id_int = int(role_id)
+            except (ValueError, TypeError):
+                pass
         
-        # Include mask_rule_ids (default: "531582")
-        mask_rule_ids_str = form_data.get("mask_rule_ids", "531582")
-        try:
-            # Parse comma-separated string to list of integers
-            mask_rule_ids = [int(id.strip()) for id in mask_rule_ids_str.split(",") if id.strip()]
-            if mask_rule_ids:
-                payload["mask_rule_ids"] = mask_rule_ids
-            else:
-                # Empty list after parsing, use default
-                payload["mask_rule_ids"] = [531582]
-        except ValueError:
-            # If parsing fails, use default
-            payload["mask_rule_ids"] = [531582]
+        # Build payload in specified order: user_id, role_id, version, app_name, status, app_category_code, download_url, coppa_value
+        payload = OrderedDict()
+        if user_id_int:
+            payload["user_id"] = user_id_int
+        if role_id_int:
+            payload["role_id"] = role_id_int
+        payload["version"] = "1.0"  # API version (fixed value)
+        payload["app_name"] = app_name
+        payload["status"] = 2  # Default: Live (will be overridden by pangle_api.py if sandbox mode)
+        payload["app_category_code"] = form_data.get("app_category_code")
+        payload["download_url"] = download_url
+        
+        # Include mask_rule_ids only if explicitly provided (optional field)
+        mask_rule_ids_str = form_data.get("mask_rule_ids", "").strip()
+        if mask_rule_ids_str:  # Only include if user explicitly provided a value
+            try:
+                # Parse comma-separated string to list of integers
+                mask_rule_ids = [int(id.strip()) for id in mask_rule_ids_str.split(",") if id.strip()]
+                if mask_rule_ids:
+                    payload["mask_rule_ids"] = mask_rule_ids
+            except ValueError:
+                # If parsing fails, skip it (optional field, so we don't include invalid values)
+                pass
         
         # Include coppa_value if provided (default is 0)
         coppa_value = form_data.get("coppa_value", 0)
         if coppa_value is not None:
             payload["coppa_value"] = coppa_value
+        
+        # Note: timestamp, nonce, sign are generated dynamically by pangle_api.py
+        # Note: status will be overridden by pangle_api.py based on sandbox mode
         
         return payload
     

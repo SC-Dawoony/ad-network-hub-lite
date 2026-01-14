@@ -163,7 +163,7 @@ class IronSourceAPI(BaseNetworkAPI):
         self.logger.info(f"[IronSource] API Request: POST {url}")
         masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
         self.logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        self.logger.info(f"[IronSource] Request Body: {json.dumps(make_sensitive_data(ad_units), indent=2)}")
+        self.logger.info(f"[IronSource] Request Body: {json.dumps(mask_sensitive_data(ad_units), indent=2)}")
         
         try:
             # API accepts an array of ad units
@@ -203,7 +203,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except json.JSONDecodeError as e:
                 # Invalid JSON response
                 self.logger.error(f"[IronSource] JSON decode error: {str(e)}")
@@ -305,7 +305,7 @@ class IronSourceAPI(BaseNetworkAPI):
         self.logger.info(f"[IronSource] API Request: PUT {url}")
         masked_headers = {k: "***MASKED***" if k.lower() == "authorization" else v for k, v in headers.items()}
         self.logger.info(f"[IronSource] Request Headers: {json.dumps(masked_headers, indent=2)}")
-        self.logger.info(f"[IronSource] Request Body: {json.dumps(make_sensitive_data(ad_units), indent=2)}")
+        self.logger.info(f"[IronSource] Request Body: {json.dumps(mask_sensitive_data(ad_units), indent=2)}")
         
         try:
             # API accepts an array of ad units
@@ -345,7 +345,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
             except json.JSONDecodeError as e:
                 # Invalid JSON response
                 self.logger.error(f"[IronSource] JSON decode error: {str(e)}")
@@ -486,7 +486,7 @@ class IronSourceAPI(BaseNetworkAPI):
             try:
                 result = response.json()
                 # Log response
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
                 
                 # Normalize response - should be a list
                 instances = result if isinstance(result, list) else result.get("instances", result.get("data", result.get("list", [])))
@@ -591,7 +591,7 @@ class IronSourceAPI(BaseNetworkAPI):
             
             if response.status_code == 200:
                 result = response.json()
-                self.logger.info(f"[IronSource] Response Body: {json.dumps(make_sensitive_data(result), indent=2)}")
+                self.logger.info(f"[IronSource] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
                 
                 # IronSource API 응답 형식에 맞게 파싱
                 # 응답은 JSON 배열 또는 객체일 수 있음

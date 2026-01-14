@@ -81,18 +81,10 @@ class PangleAPI(BaseNetworkAPI):
             logger.error("[Pangle] PANGLE_SECURITY_KEY not found in environment")
             return None
         
-        # Get user_id and role_id (from payload first, then env)
-        user_id = None
-        role_id = None
-        
-        if payload:
-            user_id = payload.get("user_id")
-            role_id = payload.get("role_id")
-        
-        if not user_id:
-            user_id = self.user_id
-        if not role_id:
-            role_id = self.role_id
+        # Get user_id and role_id from environment variables only
+        # Always use .env values to ensure consistency
+        user_id = self.user_id
+        role_id = self.role_id
         
         if not user_id or not role_id:
             logger.error("[Pangle] PANGLE_USER_ID and PANGLE_ROLE_ID must be set")
@@ -165,20 +157,15 @@ class PangleAPI(BaseNetworkAPI):
         status = 6 if self.sandbox else 2  # 6 = test, 2 = Live
         
         # Build request parameters
+        # Start with auth_params (user_id, role_id, timestamp, nonce, sign)
         request_params = auth_params.copy()
+        
+        # Add status
         request_params["status"] = status
-        request_params.update({
-            "app_name": payload.get("app_name"),
-            "download_url": payload.get("download_url"),
-            "app_category_code": payload.get("app_category_code"),
-        })
         
-        # Add optional fields
-        if payload.get("mask_rule_ids"):
-            request_params["mask_rule_ids"] = payload.get("mask_rule_ids")
-        
-        if payload.get("coppa_value") is not None:
-            request_params["coppa_value"] = payload.get("coppa_value")
+        # Add all fields from payload (most of the request body)
+        # This includes: app_name, download_url, app_category_code, version, mask_rule_ids, coppa_value
+        request_params.update(payload)
         
         # Build URL
         url = f"{self.base_url}/union/media/open_api/site/create"
