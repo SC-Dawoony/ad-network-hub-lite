@@ -244,4 +244,137 @@ class VungleAPI(BaseNetworkAPI):
         TODO: Implement when needed
         """
         return []
+    
+    def get_placement(self, placement_id: str) -> Dict:
+        """Get a specific placement by ID
+        
+        API: GET https://publisher-api.vungle.com/api/v1/placements/{id}
+        
+        Args:
+            placement_id: Placement ID
+            
+        Returns:
+            API response dict
+        """
+        url = f"{self.base_url}/placements/{placement_id}"
+        
+        headers = self._get_headers()
+        if not headers:
+            return {
+                "status": 1,
+                "code": "AUTH_ERROR",
+                "msg": "Failed to obtain Vungle JWT token. Please check LIFTOFF_SECRET_TOKEN or VUNGLE_SECRET_TOKEN in .env file or Streamlit secrets."
+            }
+        
+        self.logger.info(f"[Vungle] API Request: GET {url}")
+        
+        try:
+            response = self._make_request("GET", url, headers=headers, timeout=30)
+            
+            self.logger.info(f"[Vungle] Response Status: {response.status_code}")
+            
+            try:
+                result = response.json()
+                self.logger.info(f"[Vungle] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
+            except:
+                self.logger.error(f"[Vungle] Response Text: {response.text}")
+                result = {"code": response.status_code, "msg": response.text}
+            
+            if response.status_code == 200:
+                return {
+                    "status": 0,
+                    "code": 0,
+                    "msg": "Success",
+                    "result": result
+                }
+            else:
+                error_msg = result.get("msg") or result.get("message") or "Unknown error"
+                error_code = result.get("code") or response.status_code
+                
+                return {
+                    "status": 1,
+                    "code": error_code,
+                    "msg": error_msg,
+                    "result": result
+                }
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"[Vungle] API Error: {str(e)}")
+            return {
+                "status": 1,
+                "code": "REQUEST_ERROR",
+                "msg": f"Request failed: {str(e)}",
+                "result": {}
+            }
+    
+    def update_placement(self, placement_id: str, payload: Dict) -> Dict:
+        """Update a placement via Vungle API
+        
+        API: PATCH https://publisher-api.vungle.com/api/v1/placements/{id}
+        
+        Args:
+            placement_id: Placement ID
+            payload: Update payload
+                {
+                    "name": "string",
+                    "allowEndCards": true,
+                    "videoOrientationOverride": "none",
+                    "status": "inactive" | "active",
+                    "isHBParticipation": true
+                }
+            
+        Returns:
+            API response dict
+        """
+        url = f"{self.base_url}/placements/{placement_id}"
+        
+        headers = self._get_headers()
+        if not headers:
+            return {
+                "status": 1,
+                "code": "AUTH_ERROR",
+                "msg": "Failed to obtain Vungle JWT token. Please check LIFTOFF_SECRET_TOKEN or VUNGLE_SECRET_TOKEN in .env file or Streamlit secrets."
+            }
+        
+        self.logger.info(f"[Vungle] API Request: PATCH {url}")
+        self.logger.info(f"[Vungle] Request Headers: {json.dumps(mask_sensitive_data(headers), indent=2)}")
+        self.logger.info(f"[Vungle] Request Payload: {json.dumps(mask_sensitive_data(payload), indent=2)}")
+        
+        try:
+            # Use PATCH method
+            response = requests.patch(url, headers=headers, json=payload, timeout=30)
+            
+            self.logger.info(f"[Vungle] Response Status: {response.status_code}")
+            
+            try:
+                result = response.json()
+                self.logger.info(f"[Vungle] Response Body: {json.dumps(mask_sensitive_data(result), indent=2)}")
+            except:
+                self.logger.error(f"[Vungle] Response Text: {response.text}")
+                result = {"code": response.status_code, "msg": response.text}
+            
+            if response.status_code == 200:
+                return {
+                    "status": 0,
+                    "code": 0,
+                    "msg": "Success",
+                    "result": result
+                }
+            else:
+                error_msg = result.get("msg") or result.get("message") or "Unknown error"
+                error_code = result.get("code") or response.status_code
+                
+                return {
+                    "status": 1,
+                    "code": error_code,
+                    "msg": error_msg,
+                    "result": result
+                }
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"[Vungle] API Error: {str(e)}")
+            return {
+                "status": 1,
+                "code": "REQUEST_ERROR",
+                "msg": f"Request failed: {str(e)}",
+                "result": {}
+            }
 

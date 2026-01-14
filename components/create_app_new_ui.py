@@ -1538,62 +1538,136 @@ def render_new_create_app_ui():
                                                     disabled=True
                                                 )
                                         
-                                        # Create buttons for each unit type
-                                        create_unit_cols = st.columns(len(unit_names))
-                                        for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
-                                            with create_unit_cols[idx]:
-                                                if st.button(
-                                                    f"✅ Create {slot_type} ({platform_display})",
-                                                    key=f"create_unit_{network_key}_{platform_value}_{slot_type}",
-                                                    use_container_width=True
-                                                ):
-                                                    try:
-                                                        # Build app_info for this platform
-                                                        platform_app_info = app_info.copy()
-                                                        platform_app_info["vungleAppId"] = vungle_app_id
-                                                        platform_app_info["appId"] = vungle_app_id
-                                                        platform_app_info["appCode"] = str(vungle_app_id)
-                                                        platform_app_info["platformStr"] = platform_str_for_unit
-                                                        platform_app_info["pkgName"] = pkg_name
-                                                        platform_app_info["bundleId"] = bundle_id
-                                                        platform_app_info["name"] = app_name
+                                        # Create single button to create all units for this platform
+                                        if st.button(
+                                            f"✅ Create All {platform_display} Units (RV, IS, BN)",
+                                            key=f"create_all_units_{network_key}_{platform_value}",
+                                            use_container_width=True,
+                                            type="primary"
+                                        ):
+                                            # Step 1: Deactivate existing placements for this app (Vungle requirement)
+                                            try:
+                                                with st.spinner(f"Deactivating existing placements for {platform_display}..."):
+                                                    existing_placements = network_manager._get_vungle_placements_by_app_id(str(vungle_app_id))
+                                                    
+                                                    if existing_placements:
+                                                        deactivated_count = 0
+                                                        for placement in existing_placements:
+                                                            placement_id = placement.get("id") or placement.get("placementId")
+                                                            if placement_id:
+                                                                try:
+                                                                    # Use VungleAPI to update placement status to inactive
+                                                                    if network_manager._vungle_api is None:
+                                                                        from utils.network_apis.vungle_api import VungleAPI
+                                                                        network_manager._vungle_api = VungleAPI()
+                                                                    
+                                                                    update_payload = {
+                                                                        "status": "inactive"
+                                                                    }
+                                                                    
+                                                                    update_response = network_manager._vungle_api.update_placement(str(placement_id), update_payload)
+                                                                    
+                                                                    if update_response and (update_response.get('status') == 0 or update_response.get('code') == 0):
+                                                                        deactivated_count += 1
+                                                                    else:
+                                                                        logger.warning(f"[Vungle] Failed to deactivate placement {placement_id}: {update_response.get('msg', 'Unknown error')}")
+                                                                except Exception as e:
+                                                                    logger.warning(f"[Vungle] Error deactivating placement {placement_id}: {str(e)}")
                                                         
-                                                        from components.create_app_helpers import create_default_slot
-                                                        create_default_slot(
-                                                            network_key,
-                                                            platform_app_info,
-                                                            slot_type.lower(),
-                                                            network_manager,
-                                                            config
-                                                        )
+                                                        if deactivated_count > 0:
+                                                            st.info(f"ℹ️ {deactivated_count}개 기존 placements를 inactive로 변경했습니다.")
+                                                        else:
+                                                            st.info("ℹ️ 기존 placements를 찾을 수 없거나 이미 inactive 상태입니다.")
+                                                    else:
+                                                        st.info("ℹ️ 기존 placements가 없습니다.")
+                                            except Exception as e:
+                                                logger.warning(f"[Vungle] Error fetching/deactivating existing placements: {str(e)}")
+                                                st.warning(f"⚠️ 기존 placements 조회/비활성화 중 오류 발생: {str(e)}. 계속 진행합니다...")
+                                            
+                                            success_count = 0
+                                            failure_count = 0
+                                            
+                                            for slot_type, slot_name in unit_names.items():
+                                                try:
+                                                    # Build payload using config.build_unit_payload
+                                                    slot_type_lower = slot_type.lower()
+                                                    unit_type_map = {
+                                                        "RV": "rewarded",
+                                                        "IS": "interstitial",
+                                                        "BN": "banner"
+                                                    }
+                                                    vungle_unit_type = unit_type_map.get(slot_type, slot_type_lower)
+                                                    
+                                                    form_data = {
+                                                        "application": str(vungle_app_id),
+                                                        "name": slot_name,
+                                                        "type": vungle_unit_type
+                                                    }
+                                                    
+                                                    payload = config.build_unit_payload(form_data)
+                                                    
+                                                    # Create unit
+                                                    with st.spinner(f"Creating {slot_type} ({platform_display})..."):
+                                                        response = network_manager.create_unit(network_key, payload)
                                                         
-                                                        # Track unit creation result
-                                                        if network_key not in st.session_state.creation_results:
-                                                            st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
-                                                        st.session_state.creation_results[network_key]["units"].append({
-                                                            "platform": platform_display,
-                                                            "app_name": app_name,
-                                                            "unit_name": slot_name,
-                                                            "unit_type": slot_type.upper(),
-                                                            "success": True
-                                                        })
-                                                        
-                                                        st.success(f"✅ {slot_type} Unit 생성 완료! ({platform_display})")
-                                                    except Exception as e:
-                                                        # Track unit creation failure
-                                                        if network_key not in st.session_state.creation_results:
-                                                            st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
-                                                        st.session_state.creation_results[network_key]["units"].append({
-                                                            "platform": platform_display,
-                                                            "app_name": app_name,
-                                                            "unit_name": slot_name,
-                                                            "unit_type": slot_type.upper(),
-                                                            "success": False,
-                                                            "error": str(e)
-                                                        })
-                                                        
-                                                        st.error(f"❌ {slot_type} Unit 생성 실패 ({platform_display}): {str(e)}")
-                                                        logger.error(f"Error creating {slot_type} unit for {network_key} ({platform_display}): {str(e)}", exc_info=True)
+                                                        if response and (response.get('status') == 0 or response.get('code') == 0):
+                                                            success_count += 1
+                                                            
+                                                            # Track unit creation result
+                                                            if network_key not in st.session_state.creation_results:
+                                                                st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                            st.session_state.creation_results[network_key]["units"].append({
+                                                                "platform": platform_display,
+                                                                "app_name": app_name,
+                                                                "unit_name": slot_name,
+                                                                "unit_type": slot_type,
+                                                                "success": True
+                                                            })
+                                                            
+                                                            st.success(f"✅ {slot_type} Unit 생성 완료! ({platform_display})")
+                                                        else:
+                                                            failure_count += 1
+                                                            error_msg = response.get("msg", "Unknown error") if response else "No response"
+                                                            
+                                                            # Track unit creation failure
+                                                            if network_key not in st.session_state.creation_results:
+                                                                st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                            st.session_state.creation_results[network_key]["units"].append({
+                                                                "platform": platform_display,
+                                                                "app_name": app_name,
+                                                                "unit_name": slot_name,
+                                                                "unit_type": slot_type,
+                                                                "success": False,
+                                                                "error": error_msg
+                                                            })
+                                                            
+                                                            st.error(f"❌ {slot_type} Unit 생성 실패 ({platform_display}): {error_msg}")
+                                                except Exception as e:
+                                                    failure_count += 1
+                                                    
+                                                    # Track unit creation failure
+                                                    if network_key not in st.session_state.creation_results:
+                                                        st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                    st.session_state.creation_results[network_key]["units"].append({
+                                                        "platform": platform_display,
+                                                        "app_name": app_name,
+                                                        "unit_name": slot_name,
+                                                        "unit_type": slot_type,
+                                                        "success": False,
+                                                        "error": str(e)
+                                                    })
+                                                    
+                                                    st.error(f"❌ {slot_type} Unit 생성 실패 ({platform_display}): {str(e)}")
+                                                    logger.error(f"Error creating {slot_type} unit for {network_key} ({platform_display}): {str(e)}", exc_info=True)
+                                            
+                                            # Summary
+                                            if success_count == 3:
+                                                st.balloons()
+                                                st.success(f"🎉 {platform_display} 모든 Unit 생성 완료! (RV, IS, BN)")
+                                            elif success_count > 0:
+                                                st.warning(f"⚠️ {platform_display} {success_count}/3 Unit 생성 완료, {failure_count}개 실패")
+                                            else:
+                                                st.error(f"❌ {platform_display} 모든 Unit 생성 실패")
                                     else:
                                         st.warning(f"⚠️ {platform_display}: Unit 이름을 생성할 수 없습니다.")
                                     
