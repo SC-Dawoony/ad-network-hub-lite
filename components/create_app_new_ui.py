@@ -848,7 +848,9 @@ def render_new_create_app_ui():
                 
                 # Show Create Unit section if any apps were created successfully OR AppLovin is selected
                 # AppLovin doesn't require app creation, so show Create Unit section if selected
-                show_create_unit = success_count > 0 or "applovin" in selected_networks
+                # Also check session state to persist across reruns
+                created_apps_in_session = st.session_state.get("created_apps_by_network", {})
+                show_create_unit = success_count > 0 or "applovin" in selected_networks or bool(created_apps_in_session)
                 
                 # Initialize created_apps_by_network outside the if block to avoid UnboundLocalError
                 # Use session state to persist data across reruns
@@ -2252,61 +2254,60 @@ def render_new_create_app_ui():
                                                 if not app_code:
                                                     st.error(f"❌ {slot_type} Unit 생성 실패: App Code를 찾을 수 없습니다.")
                                                     logger.error(f"App Code not found for {network_key}: {app_info}")
-                                                    continue
-                                                
-                                                # Build payload based on network
-                                                if network_key == "bigoads":
-                                                    payload = {
-                                                        "appCode": str(app_code).strip(),
-                                                        "name": slot_name,
-                                                    }
-                                                    if slot_type.lower() == "rv":
-                                                        payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
-                                                    elif slot_type.lower() == "is":
-                                                        payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
-                                                    elif slot_type.lower() == "bn":
-                                                        payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
                                                 else:
-                                                    # For other networks, try to use config.build_unit_payload if available
-                                                    if hasattr(config, 'build_unit_payload'):
-                                                        payload = config.build_unit_payload({
-                                                            "appCode": str(app_code).strip(),
-                                                            "name": slot_name,
-                                                            "slotType": slot_type.lower()
-                                                        })
-                                                    else:
-                                                        # Fallback: basic payload
+                                                    # Build payload based on network
+                                                    if network_key == "bigoads":
                                                         payload = {
                                                             "appCode": str(app_code).strip(),
                                                             "name": slot_name,
                                                         }
-                                                
-                                                # Make API call
-                                                with st.spinner(f"Creating {slot_type.upper()} unit..."):
-                                                    response = network_manager.create_unit(network_key, payload)
-                                                    
-                                                    # Check response
-                                                    is_success = response.get('status') == 0 or response.get('code') == 0
-                                                    
-                                                    # Track unit creation result
-                                                    platform_str = app_info.get("platformStr", "android")
-                                                    platform_display = "Android" if platform_str.lower() == "android" else "iOS"
-                                                    if network_key not in st.session_state.creation_results:
-                                                        st.session_state.creation_results[network_key] = {"network": platform_display, "apps": [], "units": []}
-                                                    st.session_state.creation_results[network_key]["units"].append({
-                                                        "platform": platform_display,
-                                                        "app_name": app_info.get("name", "Unknown"),
-                                                        "unit_name": slot_name,
-                                                        "unit_type": slot_type.upper(),
-                                                        "success": is_success
-                                                    })
-                                                    
-                                                    if is_success:
-                                                        st.success(f"✅ {slot_type} Unit 생성 완료!")
+                                                        if slot_type.lower() == "rv":
+                                                            payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
+                                                        elif slot_type.lower() == "is":
+                                                            payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
+                                                        elif slot_type.lower() == "bn":
+                                                            payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
                                                     else:
-                                                        error_msg = response.get("msg", "Unknown error") if response else "No response"
-                                                        st.error(f"❌ {slot_type} Unit 생성 실패: {error_msg}")
-                                                        logger.error(f"Failed to create {slot_type} unit for {network_key}: {error_msg}")
+                                                        # For other networks, try to use config.build_unit_payload if available
+                                                        if hasattr(config, 'build_unit_payload'):
+                                                            payload = config.build_unit_payload({
+                                                                "appCode": str(app_code).strip(),
+                                                                "name": slot_name,
+                                                                "slotType": slot_type.lower()
+                                                            })
+                                                        else:
+                                                            # Fallback: basic payload
+                                                            payload = {
+                                                                "appCode": str(app_code).strip(),
+                                                                "name": slot_name,
+                                                            }
+                                                    
+                                                    # Make API call
+                                                    with st.spinner(f"Creating {slot_type.upper()} unit..."):
+                                                        response = network_manager.create_unit(network_key, payload)
+                                                        
+                                                        # Check response
+                                                        is_success = response.get('status') == 0 or response.get('code') == 0
+                                                        
+                                                        # Track unit creation result
+                                                        platform_str = app_info.get("platformStr", "android")
+                                                        platform_display = "Android" if platform_str.lower() == "android" else "iOS"
+                                                        if network_key not in st.session_state.creation_results:
+                                                            st.session_state.creation_results[network_key] = {"network": platform_display, "apps": [], "units": []}
+                                                        st.session_state.creation_results[network_key]["units"].append({
+                                                            "platform": platform_display,
+                                                            "app_name": app_info.get("name", "Unknown"),
+                                                            "unit_name": slot_name,
+                                                            "unit_type": slot_type.upper(),
+                                                            "success": is_success
+                                                        })
+                                                        
+                                                        if is_success:
+                                                            st.success(f"✅ {slot_type} Unit 생성 완료!")
+                                                        else:
+                                                            error_msg = response.get("msg", "Unknown error") if response else "No response"
+                                                            st.error(f"❌ {slot_type} Unit 생성 실패: {error_msg}")
+                                                            logger.error(f"Failed to create {slot_type} unit for {network_key}: {error_msg}")
                                             except Exception as e:
                                                 # Track unit creation failure
                                                 platform_str = app_info.get("platformStr", "android")
