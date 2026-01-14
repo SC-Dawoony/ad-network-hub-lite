@@ -1935,16 +1935,24 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                         
                         # Map AppLovin network names to display names
                         network_display_map = {}
+                        # Special display name mappings for networks not in registry
+                        special_display_names = {
+                            "VUNGLE_BIDDING": "Vungle (Liftoff)"
+                        }
                         for applovin_network in AD_NETWORKS:
-                            # Convert AppLovin network name to actual network identifier
-                            actual_network = map_applovin_network_to_actual_network(applovin_network)
-                            if actual_network:
-                                # Get display name from network configs
-                                display_name = display_names.get(actual_network, applovin_network)
-                                network_display_map[applovin_network] = display_name
+                            # Check for special display name first
+                            if applovin_network in special_display_names:
+                                network_display_map[applovin_network] = special_display_names[applovin_network]
                             else:
-                                # Fallback: use AppLovin network name as display name
-                                network_display_map[applovin_network] = applovin_network.replace("_BIDDING", "").replace("_", " ").title()
+                                # Convert AppLovin network name to actual network identifier
+                                actual_network = map_applovin_network_to_actual_network(applovin_network)
+                                if actual_network:
+                                    # Get display name from network configs
+                                    display_name = display_names.get(actual_network, applovin_network)
+                                    network_display_map[applovin_network] = display_name
+                                else:
+                                    # Fallback: use AppLovin network name as display name
+                                    network_display_map[applovin_network] = applovin_network.replace("_BIDDING", "").replace("_", " ").title()
                         
                         # Initialize selected networks in session state (default: empty)
                         if "selected_ad_networks" not in st.session_state:
