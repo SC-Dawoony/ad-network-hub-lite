@@ -2144,13 +2144,43 @@ def render_new_create_app_ui():
                                     platform_value = platform.lower() if isinstance(platform, str) else "android"
                                     
                                     # Get platform-specific package name/bundle ID from mapped_params
+                                    # For InMobi, also try to get from store_info in session state
                                     if platform_value == "android":
                                         pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+                                        # For InMobi, try to get from store_info_android first, then from androidStoreUrl
+                                        if not pkg_name and network_key == "inmobi":
+                                            # Try from session state store_info
+                                            android_info = st.session_state.get("store_info_android", {})
+                                            if android_info:
+                                                pkg_name = android_info.get("package_name", "")
+                                            # Fallback: extract from androidStoreUrl
+                                            if not pkg_name:
+                                                android_store_url = mapped_params.get("androidStoreUrl", "")
+                                                if android_store_url and "id=" in android_store_url:
+                                                    try:
+                                                        pkg_name = android_store_url.split("id=")[1].split("&")[0].split("#")[0]
+                                                    except:
+                                                        pass
                                         bundle_id = ""  # Android uses package name only
                                         platform_str_for_unit = "android"
                                     elif platform_value == "ios":
                                         pkg_name = ""  # iOS uses bundle ID only
                                         bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                        # For InMobi, try to get from store_info_ios first, then from iosStoreUrl
+                                        if not bundle_id and network_key == "inmobi":
+                                            # Try from session state store_info
+                                            ios_info = st.session_state.get("store_info_ios", {})
+                                            if ios_info:
+                                                bundle_id = ios_info.get("bundle_id", "")
+                                            # Fallback: extract from iosStoreUrl
+                                            if not bundle_id:
+                                                ios_store_url = mapped_params.get("iosStoreUrl", "")
+                                                if ios_store_url and "/id" in ios_store_url:
+                                                    try:
+                                                        # Extract iTunes ID (e.g., id6444113828)
+                                                        bundle_id = ios_store_url.rstrip("/").split("/")[-1]
+                                                    except:
+                                                        pass
                                         platform_str_for_unit = "ios"
                                     else:
                                         continue
