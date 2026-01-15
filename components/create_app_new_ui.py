@@ -29,7 +29,7 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
     Returns:
         List of created unit results
     """
-    from components.create_app_helpers import generate_slot_name
+    import json
     
     created_units = []
     
@@ -43,108 +43,169 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
     if not app_code:
         return created_units
     
-    # Get package name/bundle ID for unit name generation
-    platform_lower = platform.lower()
-    if platform_lower == "android":
-        pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
-        if not pkg_name and network_key == "inmobi":
-            android_info = st.session_state.get("store_info_android", {})
-            if android_info:
-                pkg_name = android_info.get("package_name", "")
-        bundle_id = ""
-        android_package_for_unit = None
-    else:  # iOS
-        pkg_name = ""
-        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
-        if not bundle_id and network_key == "inmobi":
-            ios_info = st.session_state.get("store_info_ios", {})
-            if ios_info:
-                bundle_id = ios_info.get("bundle_id", "")
-        
-        # For iOS, use user-selected identifier if available, otherwise try Android package name
-        android_package_for_unit = None
-        if "ios_ad_unit_identifier" in st.session_state:
-            # Use user-selected value
-            selected_identifier = st.session_state.ios_ad_unit_identifier.get("value", "")
-            if selected_identifier:
-                android_package_for_unit = selected_identifier
-        else:
-            # Fallback: try to use Android package name if available
-            android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
-            if not android_package_for_unit and network_key == "inmobi":
-                android_info = st.session_state.get("store_info_android", {})
-                if android_info:
-                    android_package_for_unit = android_info.get("package_name", "")
-                    # Extract last part if it's a full package name
-                    if '.' in android_package_for_unit:
-                        android_package_for_unit = android_package_for_unit.split('.')[-1]
+    # Try to use pre-prepared unit payloads from preview_data
+    preview_data = st.session_state.get("preview_data", {})
+    preview_info = preview_data.get(network_key, {})
+    unit_payloads = preview_info.get("unit_payloads", {})
     
-    # Create RV, IS, BN units sequentially
-    for slot_type in ["rv", "is", "bn"]:
-        slot_name = generate_slot_name(
-            pkg_name,
-            platform_lower,
-            slot_type,
-            network_key,
-            bundle_id=bundle_id,
-            network_manager=network_manager,
-            app_name=app_name,
-            android_package_name=android_package_for_unit if platform_lower == "ios" else None
-        )
+    # Determine platform key for unit payloads
+    platform_key = platform if platform in unit_payloads else ("default" if "default" in unit_payloads else None)
+    
+    if platform_key and platform_key in unit_payloads:
+        # Use pre-prepared unit payloads
+        platform_units = unit_payloads[platform_key]
         
-        if slot_name:
+        for slot_type, unit_payload_template in platform_units.items():
             try:
-                # Build unit payload
-                if network_key == "bigoads":
-                    unit_payload = {
-                        "appCode": str(app_code).strip(),
-                        "name": slot_name,
-                    }
-                    if slot_type.lower() == "rv":
-                        unit_payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
-                    elif slot_type.lower() == "is":
-                        unit_payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
-                    elif slot_type.lower() == "bn":
-                        unit_payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
-                else:
-                    # Use config.build_unit_payload if available
-                    if hasattr(config, 'build_unit_payload'):
-                        unit_payload = config.build_unit_payload({
-                            "appCode": str(app_code).strip(),
-                            "name": slot_name,
-                            "slotType": slot_type.lower()
-                        })
-                    else:
-                        unit_payload = {
-                            "appCode": str(app_code).strip(),
-                            "name": slot_name,
-                        }
+                # Deep copy the template payload
+                unit_payload = json.loads(json.dumps(unit_payload_template))
+                
+                # Replace {APP_CODE} placeholder with actual app_code
+                def replace_app_code(obj):
+                    if isinstance(obj, dict):
+                        for key, value in obj.items():
+                            if isinstance(value, str) and "{APP_CODE}" in value:
+                                obj[key] = value.replace("{APP_CODE}", str(app_code).strip())
+                            elif isinstance(value, (dict, list)):
+                                replace_app_code(value)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            replace_app_code(item)
+                
+                replace_app_code(unit_payload)
                 
                 # Create unit
-                with st.spinner(f"{network_display} - {platform} {slot_type.upper()} Unit 생성 중..."):
+                with st.spinner(f"{network_display} - {platform} {slot_type} Unit 생성 중..."):
                     unit_response = network_manager.create_unit(network_key, unit_payload)
                     
                     unit_success = unit_response.get('status') == 0 or unit_response.get('code') == 0
                     if unit_success:
-                        st.success(f"✅ {network_display} - {platform} {slot_type.upper()} Unit 생성 완료!")
+                        st.success(f"✅ {network_display} - {platform} {slot_type} Unit 생성 완료!")
                         if network_key not in st.session_state.creation_results:
                             st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                        unit_name = unit_payload.get("name", f"{slot_type}_unit")
                         st.session_state.creation_results[network_key]["units"].append({
                             "platform": platform,
                             "app_name": app_name,
-                            "unit_name": slot_name,
-                            "unit_type": slot_type.upper(),
+                            "unit_name": unit_name,
+                            "unit_type": slot_type,
                             "success": True
                         })
-                        created_units.append({"slot_type": slot_type.upper(), "success": True, "slot_name": slot_name})
+                        created_units.append({"slot_type": slot_type, "success": True, "slot_name": unit_name})
                     else:
                         error_msg = unit_response.get("msg", "Unknown error") if unit_response else "No response"
-                        st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {error_msg}")
-                        created_units.append({"slot_type": slot_type.upper(), "success": False, "error": error_msg})
+                        st.warning(f"⚠️ {network_display} - {platform} {slot_type} Unit 생성 실패: {error_msg}")
+                        created_units.append({"slot_type": slot_type, "success": False, "error": error_msg})
             except Exception as e:
-                st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {str(e)}")
+                st.warning(f"⚠️ {network_display} - {platform} {slot_type} Unit 생성 실패: {str(e)}")
                 logger.error(f"Error creating {slot_type} unit for {network_key} {platform}: {str(e)}", exc_info=True)
-                created_units.append({"slot_type": slot_type.upper(), "success": False, "error": str(e)})
+                created_units.append({"slot_type": slot_type, "success": False, "error": str(e)})
+    else:
+        # Fallback to original logic if pre-prepared payloads not available
+        from components.create_app_helpers import generate_slot_name
+        
+        # Get package name/bundle ID for unit name generation
+        platform_lower = platform.lower()
+        if platform_lower == "android":
+            pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+            if not pkg_name and network_key == "inmobi":
+                android_info = st.session_state.get("store_info_android", {})
+                if android_info:
+                    pkg_name = android_info.get("package_name", "")
+            bundle_id = ""
+            android_package_for_unit = None
+        else:  # iOS
+            pkg_name = ""
+            bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+            if not bundle_id and network_key == "inmobi":
+                ios_info = st.session_state.get("store_info_ios", {})
+                if ios_info:
+                    bundle_id = ios_info.get("bundle_id", "")
+            
+            # For iOS, use user-selected identifier if available, otherwise try Android package name
+            android_package_for_unit = None
+            if "ios_ad_unit_identifier" in st.session_state:
+                # Use user-selected value
+                selected_identifier = st.session_state.ios_ad_unit_identifier.get("value", "")
+                if selected_identifier:
+                    android_package_for_unit = selected_identifier
+            else:
+                # Fallback: try to use Android package name if available
+                android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
+                if not android_package_for_unit and network_key == "inmobi":
+                    android_info = st.session_state.get("store_info_android", {})
+                    if android_info:
+                        android_package_for_unit = android_info.get("package_name", "")
+                        # Extract last part if it's a full package name
+                        if '.' in android_package_for_unit:
+                            android_package_for_unit = android_package_for_unit.split('.')[-1]
+        
+        # Create RV, IS, BN units sequentially
+        for slot_type in ["rv", "is", "bn"]:
+            slot_name = generate_slot_name(
+                pkg_name,
+                platform_lower,
+                slot_type,
+                network_key,
+                bundle_id=bundle_id,
+                network_manager=network_manager,
+                app_name=app_name,
+                android_package_name=android_package_for_unit if platform_lower == "ios" else None
+            )
+            
+            if slot_name:
+                try:
+                    # Build unit payload
+                    if network_key == "bigoads":
+                        unit_payload = {
+                            "appCode": str(app_code).strip(),
+                            "name": slot_name,
+                        }
+                        if slot_type.lower() == "rv":
+                            unit_payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
+                        elif slot_type.lower() == "is":
+                            unit_payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
+                        elif slot_type.lower() == "bn":
+                            unit_payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
+                    else:
+                        # Use config.build_unit_payload if available
+                        if hasattr(config, 'build_unit_payload'):
+                            unit_payload = config.build_unit_payload({
+                                "appCode": str(app_code).strip(),
+                                "name": slot_name,
+                                "slotType": slot_type.lower()
+                            })
+                        else:
+                            unit_payload = {
+                                "appCode": str(app_code).strip(),
+                                "name": slot_name,
+                            }
+                    
+                    # Create unit
+                    with st.spinner(f"{network_display} - {platform} {slot_type.upper()} Unit 생성 중..."):
+                        unit_response = network_manager.create_unit(network_key, unit_payload)
+                        
+                        unit_success = unit_response.get('status') == 0 or unit_response.get('code') == 0
+                        if unit_success:
+                            st.success(f"✅ {network_display} - {platform} {slot_type.upper()} Unit 생성 완료!")
+                            if network_key not in st.session_state.creation_results:
+                                st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                            st.session_state.creation_results[network_key]["units"].append({
+                                "platform": platform,
+                                "app_name": app_name,
+                                "unit_name": slot_name,
+                                "unit_type": slot_type.upper(),
+                                "success": True
+                            })
+                            created_units.append({"slot_type": slot_type.upper(), "success": True, "slot_name": slot_name})
+                        else:
+                            error_msg = unit_response.get("msg", "Unknown error") if unit_response else "No response"
+                            st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {error_msg}")
+                            created_units.append({"slot_type": slot_type.upper(), "success": False, "error": error_msg})
+                except Exception as e:
+                    st.warning(f"⚠️ {network_display} - {platform} {slot_type.upper()} Unit 생성 실패: {str(e)}")
+                    logger.error(f"Error creating {slot_type} unit for {network_key} {platform}: {str(e)}", exc_info=True)
+                    created_units.append({"slot_type": slot_type.upper(), "success": False, "error": str(e)})
     
     return created_units
 
@@ -559,7 +620,7 @@ def render_new_create_app_ui():
         with left_col:
             # Show button to open dialog if both exist and are different
             if android_package and ios_bundle_id and android_package != ios_bundle_id:
-                st.markdown("### 🔀 Ad Unit 식별자")
+                st.markdown("### 🔀 App match name")
                 
                 # Initialize selection in session state if not exists
                 if "ios_ad_unit_identifier" not in st.session_state:
@@ -576,9 +637,9 @@ def render_new_create_app_ui():
                     st.info(f"**선택된 값:** `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
                 
                 # Define dialog function
-                @st.dialog("🔀 Ad Unit 이름 생성용 식별자 선택")
+                @st.dialog("🔀 App match name 선택")
                 def identifier_selection_dialog():
-                    st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
+                    st.markdown("### 🔀 App match name")
                     st.info("💡 Android Package Name과 iOS Bundle ID가 다릅니다. Ad Unit 이름 생성 시 어떤 값을 사용할지 선택하거나 직접 입력하세요.")
                     
                     # Extract last part of Android Package Name
@@ -587,8 +648,8 @@ def render_new_create_app_ui():
                     
                     # Selection options (display original case, but store lowercase)
                     selection_options = [
-                        f"Android Package Name 마지막 부분: `{android_package_last}`",
-                        f"iOS Bundle ID 마지막 부분: `{ios_bundle_id_last}`",
+                        f"Android Package Name: `{android_package_last}`",
+                        f"iOS Bundle ID: `{ios_bundle_id_last}`",
                         "직접 입력"
                     ]
                     
@@ -647,10 +708,10 @@ def render_new_create_app_ui():
                             st.rerun()
                 
                 # Button to open dialog
-                if st.button("🔀 Ad Unit 이름 생성용 식별자 선택", key="open_identifier_dialog", use_container_width=True):
+                if st.button("🔀 App match name 선택", key="open_identifier_dialog", use_container_width=True):
                     identifier_selection_dialog()
             else:
-                st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
+                st.markdown("### 🔀 App match name")
                 st.info("💡 Android Package Name과 iOS Bundle ID가 같거나 하나만 입력된 경우 이 기능을 사용할 수 없습니다.")
         
         # Right column: IronSource Taxonomy Selection
@@ -998,16 +1059,108 @@ def render_new_create_app_ui():
                 
                 # Only add to preview_data if not already added (for error case in else branch)
                 if network_key not in preview_data or "error" not in preview_data.get(network_key, {}):
-                    preview_data[network_key] = {
-                        "display": network_display,
-                        "payloads": payloads,
-                        "params": mapped_params
-                    }
+                    # Prepare ad unit payloads for preview (with placeholder for appCode)
+                    unit_payloads = {}
+                    if config.supports_create_unit():
+                        from components.create_app_helpers import generate_slot_name
+                        network_manager = get_network_manager()
+                        
+                        # Get app name
+                        app_name = None
+                        if st.session_state.store_info_ios:
+                            app_name = st.session_state.store_info_ios.get("name", "")
+                        if not app_name and st.session_state.store_info_android:
+                            app_name = st.session_state.store_info_android.get("name", "")
+                        
+                        # Generate unit payloads for each platform
+                        for platform_key, platform_payload in payloads.items():
+                            if "error" in platform_payload:
+                                continue
+                            
+                            platform_str = platform_key if platform_key != "default" else "Android"
+                            platform_lower = platform_str.lower()
+                            
+                            # Get package name/bundle ID for unit name generation
+                            if platform_lower == "android":
+                                pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+                                if not pkg_name and network_key == "inmobi":
+                                    android_info = st.session_state.get("store_info_android", {})
+                                    if android_info:
+                                        pkg_name = android_info.get("package_name", "")
+                                bundle_id = ""
+                                android_package_for_unit = None
+                            else:  # iOS
+                                pkg_name = ""
+                                bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                if not bundle_id and network_key == "inmobi":
+                                    ios_info = st.session_state.get("store_info_ios", {})
+                                    if ios_info:
+                                        bundle_id = ios_info.get("bundle_id", "")
+                                
+                                # For iOS, use user-selected identifier if available
+                                android_package_for_unit = None
+                                if "ios_ad_unit_identifier" in st.session_state:
+                                    android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                else:
+                                    android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
+                                    if android_package_for_unit and '.' in android_package_for_unit:
+                                        android_package_for_unit = android_package_for_unit.split('.')[-1]
+                            
+                            # Generate unit payloads for RV, IS, BN
+                            platform_unit_payloads = {}
+                            for slot_type in ["rv", "is", "bn"]:
+                                slot_name = generate_slot_name(
+                                    pkg_name,
+                                    platform_lower,
+                                    slot_type,
+                                    network_key,
+                                    bundle_id=bundle_id,
+                                    network_manager=network_manager,
+                                    app_name=app_name,
+                                    android_package_name=android_package_for_unit if platform_lower == "ios" else None
+                                )
+                                
+                                if slot_name:
+                                    # Build unit payload with placeholder for appCode
+                                    if network_key == "bigoads":
+                                        unit_payload = {
+                                            "appCode": "{APP_CODE}",  # Placeholder
+                                            "name": slot_name,
+                                        }
+                                        if slot_type.lower() == "rv":
+                                            unit_payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
+                                        elif slot_type.lower() == "is":
+                                            unit_payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
+                                        elif slot_type.lower() == "bn":
+                                            unit_payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
+                                    else:
+                                        # Use config.build_unit_payload if available
+                                        if hasattr(config, 'build_unit_payload'):
+                                            try:
+                                                unit_payload = config.build_unit_payload({
+                                                    "appCode": "{APP_CODE}",  # Placeholder
+                                                    "name": slot_name,
+                                                    "slotType": slot_type.lower()
+                                                })
+                                            except Exception as e:
+                                                logger.warning(f"Failed to build unit payload for {network_key} {platform_str} {slot_type}: {str(e)}")
+                                                continue
+                                        else:
+                                            unit_payload = {
+                                                "appCode": "{APP_CODE}",  # Placeholder
+                                                "name": slot_name,
+                                            }
+                                    
+                                    platform_unit_payloads[slot_type.upper()] = unit_payload
+                            
+                            if platform_unit_payloads:
+                                unit_payloads[platform_key] = platform_unit_payloads
                     
                     preview_data[network_key] = {
                         "display": network_display,
                         "payloads": payloads,
-                        "params": mapped_params
+                        "params": mapped_params,
+                        "unit_payloads": unit_payloads  # Add unit payloads
                     }
             
             # Store preview_data in session state
@@ -1042,8 +1195,19 @@ def render_new_create_app_ui():
                             st.error(f"⚠️ {platform} Payload 생성 실패: {payload['error']}")
                         else:
                             platform_label = platform if platform != "default" else "Default"
-                            with st.expander(f"📤 {network_display} - {platform_label} Payload", expanded=False):
+                            with st.expander(f"📤 {network_display} - {platform_label} App Payload", expanded=False):
                                 st.json(payload)
+                    
+                    # Show ad unit payloads if available
+                    unit_payloads = preview_info.get("unit_payloads", {})
+                    if unit_payloads:
+                        for platform, platform_units in unit_payloads.items():
+                            platform_label = platform if platform != "default" else "Default"
+                            with st.expander(f"📦 {network_display} - {platform_label} Ad Unit Payloads (RV, IS, BN)", expanded=False):
+                                st.info("💡 `{APP_CODE}`는 앱 생성 후 실제 App ID로 자동 교체됩니다.")
+                                for slot_type, unit_payload in platform_units.items():
+                                    st.markdown(f"**{slot_type} Unit:**")
+                                    st.json(unit_payload)
                     
                     st.markdown("---")
             
