@@ -551,195 +551,206 @@ def render_new_create_app_ui():
         if st.session_state.store_info_ios:
             ios_bundle_id = st.session_state.store_info_ios.get('bundle_id', '')
         
-        # Show button to open dialog if both exist and are different
-        if android_package and ios_bundle_id and android_package != ios_bundle_id:
-            # Initialize selection in session state if not exists
-            if "ios_ad_unit_identifier" not in st.session_state:
-                # Default: use Android Package Name (last part), convert to lowercase
-                android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
-                st.session_state.ios_ad_unit_identifier = {
-                    "source": "android_package",
-                    "value": android_package_last.lower()
-                }
-            
-            # Show current selection status
-            selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
-            if selected_value:
-                st.info(f"🔀 **Ad Unit 이름 생성용 식별자:** `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
-            
-            # Define dialog function
-            @st.dialog("🔀 Ad Unit 이름 생성용 식별자 선택")
-            def identifier_selection_dialog():
-                st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
-                st.info("💡 Android Package Name과 iOS Bundle ID가 다릅니다. Ad Unit 이름 생성 시 어떤 값을 사용할지 선택하거나 직접 입력하세요.")
+        # Layout: 좌우 배치 (Ad Unit 식별자 선택 | IronSource Taxonomy 선택)
+        st.divider()
+        left_col, right_col = st.columns(2)
+        
+        # Left column: Ad Unit 이름 생성용 식별자 선택
+        with left_col:
+            # Show button to open dialog if both exist and are different
+            if android_package and ios_bundle_id and android_package != ios_bundle_id:
+                st.markdown("### 🔀 Ad Unit 식별자")
                 
-                # Extract last part of Android Package Name
-                android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
-                ios_bundle_id_last = ios_bundle_id.split('.')[-1] if '.' in ios_bundle_id else ios_bundle_id
-                
-                # Selection options (display original case, but store lowercase)
-                selection_options = [
-                    f"Android Package Name 마지막 부분: `{android_package_last}`",
-                    f"iOS Bundle ID 마지막 부분: `{ios_bundle_id_last}`",
-                    "직접 입력"
-                ]
-                
-                # Get current selection
-                current_selection = st.session_state.ios_ad_unit_identifier.get("source", "android_package")
-                if current_selection == "android_package":
-                    current_index = 0
-                elif current_selection == "ios_bundle_id":
-                    current_index = 1
-                else:
-                    current_index = 2
-                
-                selected_option = st.radio(
-                    "선택하세요:",
-                    options=selection_options,
-                    index=current_index,
-                    key="ios_ad_unit_identifier_radio_dialog"
-                )
-                
-                # Update session state based on selection (convert to lowercase)
-                if selected_option.startswith("Android Package Name"):
+                # Initialize selection in session state if not exists
+                if "ios_ad_unit_identifier" not in st.session_state:
+                    # Default: use Android Package Name (last part), convert to lowercase
+                    android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
                     st.session_state.ios_ad_unit_identifier = {
                         "source": "android_package",
                         "value": android_package_last.lower()
                     }
-                elif selected_option.startswith("iOS Bundle ID"):
-                    st.session_state.ios_ad_unit_identifier = {
-                        "source": "ios_bundle_id",
-                        "value": ios_bundle_id_last.lower()
-                    }
-                else:  # 직접 입력
-                    custom_value = st.text_input(
-                        "직접 입력:",
-                        value=st.session_state.ios_ad_unit_identifier.get("value", ""),
-                        key="ios_ad_unit_identifier_custom_dialog",
-                        help="Ad Unit 이름 생성에 사용할 식별자를 직접 입력하세요 (소문자로 저장됩니다)"
-                    )
-                    if custom_value:
-                        st.session_state.ios_ad_unit_identifier = {
-                            "source": "custom",
-                            "value": custom_value.lower()
-                        }
                 
-                # Show preview
+                # Show current selection status
                 selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
                 if selected_value:
-                    st.success(f"✅ 선택된 값: `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
+                    st.info(f"**선택된 값:** `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
                 
-                # Close dialog buttons
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✅ 확인", key="confirm_identifier_dialog", use_container_width=True, type="primary"):
-                        st.rerun()
-                with col2:
-                    if st.button("❌ 취소", key="cancel_identifier_dialog", use_container_width=True):
-                        st.rerun()
+                # Define dialog function
+                @st.dialog("🔀 Ad Unit 이름 생성용 식별자 선택")
+                def identifier_selection_dialog():
+                    st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
+                    st.info("💡 Android Package Name과 iOS Bundle ID가 다릅니다. Ad Unit 이름 생성 시 어떤 값을 사용할지 선택하거나 직접 입력하세요.")
+                    
+                    # Extract last part of Android Package Name
+                    android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
+                    ios_bundle_id_last = ios_bundle_id.split('.')[-1] if '.' in ios_bundle_id else ios_bundle_id
+                    
+                    # Selection options (display original case, but store lowercase)
+                    selection_options = [
+                        f"Android Package Name 마지막 부분: `{android_package_last}`",
+                        f"iOS Bundle ID 마지막 부분: `{ios_bundle_id_last}`",
+                        "직접 입력"
+                    ]
+                    
+                    # Get current selection
+                    current_selection = st.session_state.ios_ad_unit_identifier.get("source", "android_package")
+                    if current_selection == "android_package":
+                        current_index = 0
+                    elif current_selection == "ios_bundle_id":
+                        current_index = 1
+                    else:
+                        current_index = 2
+                    
+                    selected_option = st.radio(
+                        "선택하세요:",
+                        options=selection_options,
+                        index=current_index,
+                        key="ios_ad_unit_identifier_radio_dialog"
+                    )
+                    
+                    # Update session state based on selection (convert to lowercase)
+                    if selected_option.startswith("Android Package Name"):
+                        st.session_state.ios_ad_unit_identifier = {
+                            "source": "android_package",
+                            "value": android_package_last.lower()
+                        }
+                    elif selected_option.startswith("iOS Bundle ID"):
+                        st.session_state.ios_ad_unit_identifier = {
+                            "source": "ios_bundle_id",
+                            "value": ios_bundle_id_last.lower()
+                        }
+                    else:  # 직접 입력
+                        custom_value = st.text_input(
+                            "직접 입력:",
+                            value=st.session_state.ios_ad_unit_identifier.get("value", ""),
+                            key="ios_ad_unit_identifier_custom_dialog",
+                            help="Ad Unit 이름 생성에 사용할 식별자를 직접 입력하세요 (소문자로 저장됩니다)"
+                        )
+                        if custom_value:
+                            st.session_state.ios_ad_unit_identifier = {
+                                "source": "custom",
+                                "value": custom_value.lower()
+                            }
+                    
+                    # Show preview
+                    selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
+                    if selected_value:
+                        st.success(f"✅ 선택된 값: `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
+                    
+                    # Close dialog buttons
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ 확인", key="confirm_identifier_dialog", use_container_width=True, type="primary"):
+                            st.rerun()
+                    with col2:
+                        if st.button("❌ 취소", key="cancel_identifier_dialog", use_container_width=True):
+                            st.rerun()
+                
+                # Button to open dialog
+                if st.button("🔀 Ad Unit 이름 생성용 식별자 선택", key="open_identifier_dialog", use_container_width=True):
+                    identifier_selection_dialog()
+            else:
+                st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
+                st.info("💡 Android Package Name과 iOS Bundle ID가 같거나 하나만 입력된 경우 이 기능을 사용할 수 없습니다.")
+        
+        # Right column: IronSource Taxonomy Selection
+        with right_col:
+            st.markdown("### 📂 IronSource Taxonomy")
+            st.info("💡 IronSource 네트워크를 사용하는 경우, Taxonomy (Sub-genre)를 선택해주세요. 카테고리가 자동으로 매칭되지만 수동으로 변경할 수 있습니다.")
             
-            # Button to open dialog
-            if st.button("🔀 Ad Unit 이름 생성용 식별자 선택", key="open_identifier_dialog", use_container_width=False):
-                identifier_selection_dialog()
-        
-        # IronSource Taxonomy Selection
-        st.divider()
-        st.markdown("### 📂 IronSource Taxonomy 선택")
-        st.info("💡 IronSource 네트워크를 사용하는 경우, Taxonomy (Sub-genre)를 선택해주세요. 카테고리가 자동으로 매칭되지만 수동으로 변경할 수 있습니다.")
-        
-        # Initialize taxonomy in session state if not exists
-        if "ironsource_taxonomy" not in st.session_state:
-            st.session_state.ironsource_taxonomy = "other"
-        
-        # Get taxonomy options
-        from network_configs.ironsource_config import IronSourceConfig
-        ironsource_config = IronSourceConfig()
-        taxonomy_options = ironsource_config._get_taxonomies()
-        
-        # Build hierarchical taxonomy structure from images
-        taxonomy_structure = {
-            "Casual": {
-                "Hyper Casual": ["stacking", "dexterity", "rising/falling", "swerve", "merge", "idle", ".io", "puzzle", "tap/Timing", "turning", "ball", "other"],
-                "Puzzle": ["actionPuzzle", "match3", "bubbleShooter", "jigsaw", "crossword", "word", "trivia", "board", "coloring Games", "hidden Objects", "solitaire", "nonCasinoCardGame", "otherPuzzle"],
-                "Arcade": ["platformer", "idler", "shootEmUp", "endlessRunner", "towerDefense", "otherArcade"],
-                "Lifestyle": ["customization", "interactiveStory", "music/band", "otherLifestyle"],
-                "Simulation": ["adventures", "breeding", "tycoon/crafting", "sandbox", "cooking/timeManagement", "farming", "idleSimulation", "otherSimulation"],
-                "Kids & Family": ["kids&Family"],
-                "Other Casual": ["otherCasual"]
-            },
-            "Mid-Core": {
-                "Shooter": ["battleRoyale", "classicFPS", "snipers", "tacticalShooter", "otherShooter"],
-                "RPG": ["actionRPG", "turnBasedRPG", "fighting", "MMORPG", "puzzleRPG", "survival", "idleRPG", "otherRPG"],
-                "Card Games": ["cardBattler"],
-                "Strategy": ["4xStrategy", "build&Battle", "MOBA", "syncBattler", "otherStrategy"],
-                "Other Mid-Core": ["otherMidCore"]
-            },
-            "Sports & Racing": {
-                "Sports": ["casualSports", "licensedSports"],
-                "Racing": ["casualRacing", "simulationRacing", "otherRacing"],
-                "Other Sports & Racing": ["otherSports&Racing"]
+            # Initialize taxonomy in session state if not exists
+            if "ironsource_taxonomy" not in st.session_state:
+                st.session_state.ironsource_taxonomy = "other"
+            
+            # Get taxonomy options
+            from network_configs.ironsource_config import IronSourceConfig
+            ironsource_config = IronSourceConfig()
+            taxonomy_options = ironsource_config._get_taxonomies()
+            
+            # Build hierarchical taxonomy structure from images
+            taxonomy_structure = {
+                "Casual": {
+                    "Hyper Casual": ["stacking", "dexterity", "rising/falling", "swerve", "merge", "idle", ".io", "puzzle", "tap/Timing", "turning", "ball", "other"],
+                    "Puzzle": ["actionPuzzle", "match3", "bubbleShooter", "jigsaw", "crossword", "word", "trivia", "board", "coloring Games", "hidden Objects", "solitaire", "nonCasinoCardGame", "otherPuzzle"],
+                    "Arcade": ["platformer", "idler", "shootEmUp", "endlessRunner", "towerDefense", "otherArcade"],
+                    "Lifestyle": ["customization", "interactiveStory", "music/band", "otherLifestyle"],
+                    "Simulation": ["adventures", "breeding", "tycoon/crafting", "sandbox", "cooking/timeManagement", "farming", "idleSimulation", "otherSimulation"],
+                    "Kids & Family": ["kids&Family"],
+                    "Other Casual": ["otherCasual"]
+                },
+                "Mid-Core": {
+                    "Shooter": ["battleRoyale", "classicFPS", "snipers", "tacticalShooter", "otherShooter"],
+                    "RPG": ["actionRPG", "turnBasedRPG", "fighting", "MMORPG", "puzzleRPG", "survival", "idleRPG", "otherRPG"],
+                    "Card Games": ["cardBattler"],
+                    "Strategy": ["4xStrategy", "build&Battle", "MOBA", "syncBattler", "otherStrategy"],
+                    "Other Mid-Core": ["otherMidCore"]
+                },
+                "Sports & Racing": {
+                    "Sports": ["casualSports", "licensedSports"],
+                    "Racing": ["casualRacing", "simulationRacing", "otherRacing"],
+                    "Other Sports & Racing": ["otherSports&Racing"]
+                }
             }
-        }
-        
-        # Create API value to display name mapping
-        api_to_display = {api_value: display_name for display_name, api_value in taxonomy_options}
-        
-        # Auto-match taxonomy from app category (if not already set)
-        # Priority: Android category first, then iOS category
-        if st.session_state.ironsource_taxonomy == "other":
-            android_category = None
-            ios_category = None
             
-            if st.session_state.store_info_android:
-                android_category = st.session_state.store_info_android.get("category", "")
-            if st.session_state.store_info_ios:
-                ios_category = st.session_state.store_info_ios.get("category", "")
+            # Create API value to display name mapping
+            api_to_display = {api_value: display_name for display_name, api_value in taxonomy_options}
             
-            # Try Android category first (priority)
-            app_category = android_category if android_category else ios_category
+            # Auto-match taxonomy from app category (if not already set)
+            # Priority: Android category first, then iOS category
+            if st.session_state.ironsource_taxonomy == "other":
+                android_category = None
+                ios_category = None
+                
+                if st.session_state.store_info_android:
+                    android_category = st.session_state.store_info_android.get("category", "")
+                if st.session_state.store_info_ios:
+                    ios_category = st.session_state.store_info_ios.get("category", "")
+                
+                # Try Android category first (priority)
+                app_category = android_category if android_category else ios_category
+                
+                if app_category:
+                    from components.one_click.category_matchers import match_ironsource_taxonomy
+                    # Pass Android category for better matching (if available)
+                    auto_matched_taxonomy = match_ironsource_taxonomy(
+                        app_category, 
+                        taxonomy_options,
+                        android_category=android_category if android_category else None
+                    )
+                    if auto_matched_taxonomy and auto_matched_taxonomy != "other":
+                        st.session_state.ironsource_taxonomy = auto_matched_taxonomy
+                        if auto_matched_taxonomy in api_to_display:
+                            category_source = "Android" if android_category else "iOS"
+                            st.success(f"💡 자동 매칭 ({category_source}): '{app_category}' → '{api_to_display[auto_matched_taxonomy]}'")
             
-            if app_category:
-                from components.one_click.category_matchers import match_ironsource_taxonomy
-                # Pass Android category for better matching (if available)
-                auto_matched_taxonomy = match_ironsource_taxonomy(
-                    app_category, 
-                    taxonomy_options,
-                    android_category=android_category if android_category else None
-                )
-                if auto_matched_taxonomy and auto_matched_taxonomy != "other":
-                    st.session_state.ironsource_taxonomy = auto_matched_taxonomy
-                    if auto_matched_taxonomy in api_to_display:
-                        category_source = "Android" if android_category else "iOS"
-                        st.success(f"💡 자동 매칭 ({category_source}): '{app_category}' → '{api_to_display[auto_matched_taxonomy]}'")
-        
-        # Build flat list of all taxonomy options with category/genre info for display
-        taxonomy_display_options = []
-        for category, genres in taxonomy_structure.items():
-            for genre, sub_genres in genres.items():
-                for sub_genre in sub_genres:
-                    display_name = api_to_display.get(sub_genre, sub_genre)
-                    taxonomy_display_options.append((f"{category} > {genre} > {display_name}", sub_genre))
-        
-        # Create selectbox with hierarchical display
-        selected_index = 0
-        for idx, (display_name, api_value) in enumerate(taxonomy_display_options):
-            if api_value == st.session_state.ironsource_taxonomy:
-                selected_index = idx
-                break
-        
-        selected_taxonomy_display = st.selectbox(
-            "Taxonomy (Sub-genre)*",
-            options=[opt[0] for opt in taxonomy_display_options],
-            index=selected_index,
-            key="ironsource_taxonomy_select",
-            help="IronSource Taxonomy를 선택하세요. 계층 구조: Category > Genre > Sub-genre"
-        )
-        
-        # Extract API value from selected display
-        for display_name, api_value in taxonomy_display_options:
-            if display_name == selected_taxonomy_display:
-                st.session_state.ironsource_taxonomy = api_value
-                break
+            # Build flat list of all taxonomy options with category/genre info for display
+            taxonomy_display_options = []
+            for category, genres in taxonomy_structure.items():
+                for genre, sub_genres in genres.items():
+                    for sub_genre in sub_genres:
+                        display_name = api_to_display.get(sub_genre, sub_genre)
+                        taxonomy_display_options.append((f"{category} > {genre} > {display_name}", sub_genre))
+            
+            # Create selectbox with hierarchical display
+            selected_index = 0
+            for idx, (display_name, api_value) in enumerate(taxonomy_display_options):
+                if api_value == st.session_state.ironsource_taxonomy:
+                    selected_index = idx
+                    break
+            
+            selected_taxonomy_display = st.selectbox(
+                "Taxonomy (Sub-genre)*",
+                options=[opt[0] for opt in taxonomy_display_options],
+                index=selected_index,
+                key="ironsource_taxonomy_select",
+                help="IronSource Taxonomy를 선택하세요. 계층 구조: Category > Genre > Sub-genre"
+            )
+            
+            # Extract API value from selected display
+            for display_name, api_value in taxonomy_display_options:
+                if display_name == selected_taxonomy_display:
+                    st.session_state.ironsource_taxonomy = api_value
+                    break
         
         st.divider()
         
