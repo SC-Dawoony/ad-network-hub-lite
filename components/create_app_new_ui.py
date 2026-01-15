@@ -29,7 +29,6 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
     Returns:
         List of created unit results
     """
-    from components.create_app_new_ui import extract_app_info_from_response
     from components.create_app_helpers import generate_slot_name
     
     created_units = []
@@ -61,12 +60,24 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
             ios_info = st.session_state.get("store_info_ios", {})
             if ios_info:
                 bundle_id = ios_info.get("bundle_id", "")
-        # For iOS, try to use Android package name if available
-        android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
-        if not android_package_for_unit and network_key == "inmobi":
-            android_info = st.session_state.get("store_info_android", {})
-            if android_info:
-                android_package_for_unit = android_info.get("package_name", "")
+        
+        # For iOS, use user-selected identifier if available, otherwise try Android package name
+        android_package_for_unit = None
+        if "ios_ad_unit_identifier" in st.session_state:
+            # Use user-selected value
+            selected_identifier = st.session_state.ios_ad_unit_identifier.get("value", "")
+            if selected_identifier:
+                android_package_for_unit = selected_identifier
+        else:
+            # Fallback: try to use Android package name if available
+            android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
+            if not android_package_for_unit and network_key == "inmobi":
+                android_info = st.session_state.get("store_info_android", {})
+                if android_info:
+                    android_package_for_unit = android_info.get("package_name", "")
+                    # Extract last part if it's a full package name
+                    if '.' in android_package_for_unit:
+                        android_package_for_unit = android_package_for_unit.split('.')[-1]
     
     # Create RV, IS, BN units sequentially
     for slot_type in ["rv", "is", "bn"]:
@@ -138,6 +149,118 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
     return created_units
 
 
+def extract_app_info_from_response(network_key, response, mapped_params):
+    """Extract app info (appId, appCode, gameId, etc.) from create app response"""
+    if not response or not isinstance(response, dict):
+        return None
+    
+    result = response.get('result', {})
+    if not result:
+        result = response
+    
+    app_info = {}
+    
+    # Network-specific extraction
+    if network_key == "ironsource":
+        # IronSource: appKey from result
+        app_info["appKey"] = result.get("appKey") or response.get("appKey")
+        app_info["appCode"] = app_info["appKey"]
+    elif network_key == "mintegral":
+        # Mintegral: app_id from result.result
+        app_id = result.get("app_id") or result.get("id") or result.get("appId")
+        app_info["appId"] = app_id
+        app_info["appCode"] = str(app_id) if app_id else None
+    elif network_key == "inmobi":
+        # InMobi: appId from result.data or result
+        data = result.get("data", {}) if isinstance(result.get("data"), dict) else result
+        app_id = data.get("appId") or data.get("id") or result.get("appId")
+        app_info["appId"] = app_id
+        app_info["appCode"] = str(app_id) if app_id else None
+    elif network_key == "bigoads":
+        # BigOAds: appCode from result.result
+        app_code = result.get("appCode") or response.get("appCode")
+        app_info["appCode"] = app_code
+    elif network_key == "fyber":
+        # Fyber: appId from result.result
+        app_id = result.get("appId") or result.get("id")
+        app_info["appId"] = app_id
+        app_info["appCode"] = str(app_id) if app_id else None
+    elif network_key == "unity":
+        # Unity: gameId from result.result.stores
+        stores = result.get("stores", {})
+        apple_store = stores.get("apple", {}) if isinstance(stores.get("apple"), dict) else {}
+        google_store = stores.get("google", {}) if isinstance(stores.get("google"), dict) else {}
+        apple_game_id = apple_store.get("gameId")
+        google_game_id = google_store.get("gameId")
+        project_id = result.get("id")
+        app_info["apple_gameId"] = apple_game_id
+        app_info["google_gameId"] = google_game_id
+        app_info["project_id"] = project_id
+        app_info["appCode"] = str(apple_game_id) if apple_game_id else (str(google_game_id) if google_game_id else str(project_id) if project_id else None)
+    elif network_key == "pangle":
+        # Pangle: app_id from result.result (normalized response structure)
+        result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+        app_id = result_data.get("app_id")
+        app_info["appId"] = app_id
+        app_info["siteId"] = app_id
+        app_info["appCode"] = str(app_id) if app_id else None
+    elif network_key == "vungle":
+        # Vungle: vungleAppId from result (response is the app object itself)
+        result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else result
+        vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
+        app_info["vungleAppId"] = vungle_app_id
+        app_info["appId"] = vungle_app_id
+        app_info["appCode"] = str(vungle_app_id) if vungle_app_id else None
+        app_info["platform"] = result_data.get("platform", "")  # "ios" or "android"
+        app_info["name"] = result_data.get("name", "")
+        
+        # Extract platform-specific package name/bundle ID from mapped_params
+        platform_value = result_data.get("platform", "").lower()
+        if platform_value == "android":
+            app_info["pkgName"] = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+            app_info["platformStr"] = "android"
+        elif platform_value == "ios":
+            app_info["bundleId"] = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
+            app_info["pkgName"] = ""  # iOS doesn't use pkgName
+            app_info["platformStr"] = "ios"
+    else:
+        # Default: try common fields
+        app_code = result.get("appCode") or result.get("appId") or result.get("appKey") or result.get("id")
+        app_info["appCode"] = app_code
+    
+    # Add common fields
+    app_info["name"] = result.get("name") or mapped_params.get("name") or mapped_params.get("app_name") or "Unknown"
+    
+    # Extract platform-specific package name and bundle ID for all networks
+    # Android: use package name, iOS: use bundle ID
+    platform_str = mapped_params.get("platformStr") or mapped_params.get("platform", "android")
+    platform_value = platform_str.lower() if isinstance(platform_str, str) else "android"
+    
+    # For multi-platform networks, extract from platform-specific fields in mapped_params
+    if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"]:
+        # Try to get from platform-specific fields first
+        if platform_value == "android" or "Android" in str(platform_str):
+            app_info["pkgName"] = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("package", ""))))
+            app_info["bundleId"] = ""  # Android doesn't use bundleId
+            app_info["platformStr"] = "android"
+        elif platform_value == "ios" or "iOS" in str(platform_str) or "IOS" in str(platform_str):
+            app_info["pkgName"] = ""  # iOS doesn't use pkgName
+            app_info["bundleId"] = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("bundle", mapped_params.get("bundleId", "")))))
+            app_info["platformStr"] = "ios"
+        else:
+            # Fallback: try generic fields
+            app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
+            app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
+            app_info["platformStr"] = platform_value
+    else:
+        # Single platform or other networks: use generic fields
+        app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
+        app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
+        app_info["platformStr"] = platform_value
+    
+    return app_info if app_info.get("appCode") else None
+
+
 def map_store_info_to_network_params(
     ios_info: Optional[Dict],
     android_info: Optional[Dict],
@@ -171,8 +294,39 @@ def map_store_info_to_network_params(
             params["iosStoreUrl"] = f"https://apps.apple.com/us/app/id{ios_info.get('app_id')}"
         if android_info:
             params["androidStoreUrl"] = f"https://play.google.com/store/apps/details?id={android_info.get('package_name')}"
-        # Default values
-        params["taxonomy"] = "Games"  # Default category
+        
+        # Use taxonomy from session state (user-selected or auto-matched)
+        # If not in session state, try to match from App Store category
+        if "ironsource_taxonomy" in st.session_state:
+            params["taxonomy"] = st.session_state.ironsource_taxonomy
+        else:
+            # Map App Store category to IronSource taxonomy
+            from components.one_click.category_matchers import match_ironsource_taxonomy
+            
+            # Get category from Android first (priority), then iOS
+            android_category = None
+            ios_category = None
+            if android_info:
+                android_category = android_info.get("category", "")
+            if ios_info:
+                ios_category = ios_info.get("category", "")
+            
+            # Use Android category if available (priority)
+            app_category = android_category if android_category else ios_category
+            
+            # Get taxonomy options from config
+            taxonomy_options = config._get_taxonomies() if hasattr(config, '_get_taxonomies') else []
+            
+            # Match category to taxonomy (pass Android category for better matching)
+            matched_taxonomy = match_ironsource_taxonomy(
+                app_category, 
+                taxonomy_options,
+                android_category=android_category if android_category else None
+            ) if app_category else "other"
+            params["taxonomy"] = matched_taxonomy
+            # Store in session state for future use
+            st.session_state.ironsource_taxonomy = matched_taxonomy
+        
         params["coppa"] = 0  # Default: Not child-directed
     
     elif network == "inmobi":
@@ -387,6 +541,205 @@ def render_new_create_app_ui():
                 st.write(f"**App ID:** {info.get('app_id', 'N/A')}")
                 st.write(f"**개발자:** {info.get('developer', 'N/A')}")
                 st.write(f"**카테고리:** {info.get('category', 'N/A')}")
+        
+        # Check if Android Package Name and iOS Bundle ID are different
+        android_package = None
+        ios_bundle_id = None
+        
+        if st.session_state.store_info_android:
+            android_package = st.session_state.store_info_android.get('package_name', '')
+        if st.session_state.store_info_ios:
+            ios_bundle_id = st.session_state.store_info_ios.get('bundle_id', '')
+        
+        # Show button to open dialog if both exist and are different
+        if android_package and ios_bundle_id and android_package != ios_bundle_id:
+            # Initialize selection in session state if not exists
+            if "ios_ad_unit_identifier" not in st.session_state:
+                # Default: use Android Package Name (last part), convert to lowercase
+                android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
+                st.session_state.ios_ad_unit_identifier = {
+                    "source": "android_package",
+                    "value": android_package_last.lower()
+                }
+            
+            # Show current selection status
+            selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
+            if selected_value:
+                st.info(f"🔀 **Ad Unit 이름 생성용 식별자:** `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
+            
+            # Define dialog function
+            @st.dialog("🔀 Ad Unit 이름 생성용 식별자 선택")
+            def identifier_selection_dialog():
+                st.markdown("### 🔀 Ad Unit 이름 생성용 식별자 선택")
+                st.info("💡 Android Package Name과 iOS Bundle ID가 다릅니다. Ad Unit 이름 생성 시 어떤 값을 사용할지 선택하거나 직접 입력하세요.")
+                
+                # Extract last part of Android Package Name
+                android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
+                ios_bundle_id_last = ios_bundle_id.split('.')[-1] if '.' in ios_bundle_id else ios_bundle_id
+                
+                # Selection options (display original case, but store lowercase)
+                selection_options = [
+                    f"Android Package Name 마지막 부분: `{android_package_last}`",
+                    f"iOS Bundle ID 마지막 부분: `{ios_bundle_id_last}`",
+                    "직접 입력"
+                ]
+                
+                # Get current selection
+                current_selection = st.session_state.ios_ad_unit_identifier.get("source", "android_package")
+                if current_selection == "android_package":
+                    current_index = 0
+                elif current_selection == "ios_bundle_id":
+                    current_index = 1
+                else:
+                    current_index = 2
+                
+                selected_option = st.radio(
+                    "선택하세요:",
+                    options=selection_options,
+                    index=current_index,
+                    key="ios_ad_unit_identifier_radio_dialog"
+                )
+                
+                # Update session state based on selection (convert to lowercase)
+                if selected_option.startswith("Android Package Name"):
+                    st.session_state.ios_ad_unit_identifier = {
+                        "source": "android_package",
+                        "value": android_package_last.lower()
+                    }
+                elif selected_option.startswith("iOS Bundle ID"):
+                    st.session_state.ios_ad_unit_identifier = {
+                        "source": "ios_bundle_id",
+                        "value": ios_bundle_id_last.lower()
+                    }
+                else:  # 직접 입력
+                    custom_value = st.text_input(
+                        "직접 입력:",
+                        value=st.session_state.ios_ad_unit_identifier.get("value", ""),
+                        key="ios_ad_unit_identifier_custom_dialog",
+                        help="Ad Unit 이름 생성에 사용할 식별자를 직접 입력하세요 (소문자로 저장됩니다)"
+                    )
+                    if custom_value:
+                        st.session_state.ios_ad_unit_identifier = {
+                            "source": "custom",
+                            "value": custom_value.lower()
+                        }
+                
+                # Show preview
+                selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
+                if selected_value:
+                    st.success(f"✅ 선택된 값: `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
+                
+                # Close dialog buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ 확인", key="confirm_identifier_dialog", use_container_width=True, type="primary"):
+                        st.rerun()
+                with col2:
+                    if st.button("❌ 취소", key="cancel_identifier_dialog", use_container_width=True):
+                        st.rerun()
+            
+            # Button to open dialog
+            if st.button("🔀 Ad Unit 이름 생성용 식별자 선택", key="open_identifier_dialog", use_container_width=False):
+                identifier_selection_dialog()
+        
+        # IronSource Taxonomy Selection
+        st.divider()
+        st.markdown("### 📂 IronSource Taxonomy 선택")
+        st.info("💡 IronSource 네트워크를 사용하는 경우, Taxonomy (Sub-genre)를 선택해주세요. 카테고리가 자동으로 매칭되지만 수동으로 변경할 수 있습니다.")
+        
+        # Initialize taxonomy in session state if not exists
+        if "ironsource_taxonomy" not in st.session_state:
+            st.session_state.ironsource_taxonomy = "other"
+        
+        # Get taxonomy options
+        from network_configs.ironsource_config import IronSourceConfig
+        ironsource_config = IronSourceConfig()
+        taxonomy_options = ironsource_config._get_taxonomies()
+        
+        # Build hierarchical taxonomy structure from images
+        taxonomy_structure = {
+            "Casual": {
+                "Hyper Casual": ["stacking", "dexterity", "rising/falling", "swerve", "merge", "idle", ".io", "puzzle", "tap/Timing", "turning", "ball", "other"],
+                "Puzzle": ["actionPuzzle", "match3", "bubbleShooter", "jigsaw", "crossword", "word", "trivia", "board", "coloring Games", "hidden Objects", "solitaire", "nonCasinoCardGame", "otherPuzzle"],
+                "Arcade": ["platformer", "idler", "shootEmUp", "endlessRunner", "towerDefense", "otherArcade"],
+                "Lifestyle": ["customization", "interactiveStory", "music/band", "otherLifestyle"],
+                "Simulation": ["adventures", "breeding", "tycoon/crafting", "sandbox", "cooking/timeManagement", "farming", "idleSimulation", "otherSimulation"],
+                "Kids & Family": ["kids&Family"],
+                "Other Casual": ["otherCasual"]
+            },
+            "Mid-Core": {
+                "Shooter": ["battleRoyale", "classicFPS", "snipers", "tacticalShooter", "otherShooter"],
+                "RPG": ["actionRPG", "turnBasedRPG", "fighting", "MMORPG", "puzzleRPG", "survival", "idleRPG", "otherRPG"],
+                "Card Games": ["cardBattler"],
+                "Strategy": ["4xStrategy", "build&Battle", "MOBA", "syncBattler", "otherStrategy"],
+                "Other Mid-Core": ["otherMidCore"]
+            },
+            "Sports & Racing": {
+                "Sports": ["casualSports", "licensedSports"],
+                "Racing": ["casualRacing", "simulationRacing", "otherRacing"],
+                "Other Sports & Racing": ["otherSports&Racing"]
+            }
+        }
+        
+        # Create API value to display name mapping
+        api_to_display = {api_value: display_name for display_name, api_value in taxonomy_options}
+        
+        # Auto-match taxonomy from app category (if not already set)
+        # Priority: Android category first, then iOS category
+        if st.session_state.ironsource_taxonomy == "other":
+            android_category = None
+            ios_category = None
+            
+            if st.session_state.store_info_android:
+                android_category = st.session_state.store_info_android.get("category", "")
+            if st.session_state.store_info_ios:
+                ios_category = st.session_state.store_info_ios.get("category", "")
+            
+            # Try Android category first (priority)
+            app_category = android_category if android_category else ios_category
+            
+            if app_category:
+                from components.one_click.category_matchers import match_ironsource_taxonomy
+                # Pass Android category for better matching (if available)
+                auto_matched_taxonomy = match_ironsource_taxonomy(
+                    app_category, 
+                    taxonomy_options,
+                    android_category=android_category if android_category else None
+                )
+                if auto_matched_taxonomy and auto_matched_taxonomy != "other":
+                    st.session_state.ironsource_taxonomy = auto_matched_taxonomy
+                    if auto_matched_taxonomy in api_to_display:
+                        category_source = "Android" if android_category else "iOS"
+                        st.success(f"💡 자동 매칭 ({category_source}): '{app_category}' → '{api_to_display[auto_matched_taxonomy]}'")
+        
+        # Build flat list of all taxonomy options with category/genre info for display
+        taxonomy_display_options = []
+        for category, genres in taxonomy_structure.items():
+            for genre, sub_genres in genres.items():
+                for sub_genre in sub_genres:
+                    display_name = api_to_display.get(sub_genre, sub_genre)
+                    taxonomy_display_options.append((f"{category} > {genre} > {display_name}", sub_genre))
+        
+        # Create selectbox with hierarchical display
+        selected_index = 0
+        for idx, (display_name, api_value) in enumerate(taxonomy_display_options):
+            if api_value == st.session_state.ironsource_taxonomy:
+                selected_index = idx
+                break
+        
+        selected_taxonomy_display = st.selectbox(
+            "Taxonomy (Sub-genre)*",
+            options=[opt[0] for opt in taxonomy_display_options],
+            index=selected_index,
+            key="ironsource_taxonomy_select",
+            help="IronSource Taxonomy를 선택하세요. 계층 구조: Category > Genre > Sub-genre"
+        )
+        
+        # Extract API value from selected display
+        for display_name, api_value in taxonomy_display_options:
+            if display_name == selected_taxonomy_display:
+                st.session_state.ironsource_taxonomy = api_value
+                break
         
         st.divider()
         
@@ -740,6 +1093,25 @@ def render_new_create_app_ui():
                                 if "error" in android_payload:
                                     st.error(f"❌ {network_display} - Android: {android_payload['error']}")
                                 else:
+                                    # Validate payload for IronSource
+                                    if network_key == "ironsource":
+                                        # Check required fields
+                                        required_fields = ["appName", "platform", "storeUrl", "taxonomy"]
+                                        missing_fields = [field for field in required_fields if not android_payload.get(field)]
+                                        if missing_fields:
+                                            st.error(f"❌ {network_display} - Android: 필수 필드 누락: {', '.join(missing_fields)}")
+                                            logger.error(f"IronSource Android payload missing fields: {missing_fields}. Payload: {android_payload}")
+                                            continue
+                                        
+                                        # Validate storeUrl is not empty
+                                        if not android_payload.get("storeUrl", "").strip():
+                                            st.error(f"❌ {network_display} - Android: storeUrl이 비어있습니다.")
+                                            logger.error(f"IronSource Android payload has empty storeUrl. Payload: {android_payload}")
+                                            continue
+                                        
+                                        # Log payload for debugging
+                                        logger.info(f"IronSource Android payload: {android_payload}")
+                                    
                                     with st.spinner(f"{network_display} - Android 앱 생성 중..."):
                                         android_response = network_manager.create_app(network_key, android_payload)
                                     
@@ -785,6 +1157,25 @@ def render_new_create_app_ui():
                                 if "error" in ios_payload:
                                     st.error(f"❌ {network_display} - iOS: {ios_payload['error']}")
                                 else:
+                                    # Validate payload for IronSource
+                                    if network_key == "ironsource":
+                                        # Check required fields
+                                        required_fields = ["appName", "platform", "storeUrl", "taxonomy"]
+                                        missing_fields = [field for field in required_fields if not ios_payload.get(field)]
+                                        if missing_fields:
+                                            st.error(f"❌ {network_display} - iOS: 필수 필드 누락: {', '.join(missing_fields)}")
+                                            logger.error(f"IronSource iOS payload missing fields: {missing_fields}. Payload: {ios_payload}")
+                                            continue
+                                        
+                                        # Validate storeUrl is not empty
+                                        if not ios_payload.get("storeUrl", "").strip():
+                                            st.error(f"❌ {network_display} - iOS: storeUrl이 비어있습니다.")
+                                            logger.error(f"IronSource iOS payload has empty storeUrl. Payload: {ios_payload}")
+                                            continue
+                                        
+                                        # Log payload for debugging
+                                        logger.info(f"IronSource iOS payload: {ios_payload}")
+                                    
                                     with st.spinner(f"{network_display} - iOS 앱 생성 중..."):
                                         ios_response = network_manager.create_app(network_key, ios_payload)
                                     
@@ -1063,7 +1454,14 @@ def render_new_create_app_ui():
                                         pkg_name = ""
                                         bundle_id = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
                                         platform_str_for_unit = "ios"
-                                        android_package_for_unit = android_package if android_package else None
+                                        # Use user-selected identifier if available
+                                        if "ios_ad_unit_identifier" in st.session_state:
+                                            android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                        else:
+                                            android_package_for_unit = android_package if android_package else None
+                                            # Extract last part if it's a full package name
+                                            if android_package_for_unit and '.' in android_package_for_unit:
+                                                android_package_for_unit = android_package_for_unit.split('.')[-1]
                                     else:
                                         continue
                                     
@@ -1143,6 +1541,16 @@ def render_new_create_app_ui():
                                             from components.create_app_helpers import generate_slot_name
                                             network_manager = get_network_manager()
                                             
+                                            # Use user-selected identifier if available
+                                            android_package_for_unit = None
+                                            if "ios_ad_unit_identifier" in st.session_state:
+                                                android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                            else:
+                                                android_package_for_unit = android_package if android_package else None
+                                                # Extract last part if it's a full package name
+                                                if android_package_for_unit and '.' in android_package_for_unit:
+                                                    android_package_for_unit = android_package_for_unit.split('.')[-1]
+                                            
                                             for slot_type in ["rv", "is", "bn"]:
                                                 slot_name = generate_slot_name(
                                                     "",
@@ -1152,7 +1560,7 @@ def render_new_create_app_ui():
                                                     bundle_id=ios_bundle_id,
                                                     network_manager=network_manager,
                                                     app_name=app_name,
-                                                    android_package_name=android_package if android_package else None
+                                                    android_package_name=android_package_for_unit
                                                 )
                                                 
                                                 if slot_name:
@@ -1235,12 +1643,20 @@ def render_new_create_app_ui():
                                 pkg_name = app_info.get("pkgName", "")
                                 bundle_id = app_info.get("bundleId", "")
                                 
-                                # For iOS, check if Android package is available
+                                # For iOS, use user-selected identifier if available
                                 android_package_for_unit = None
                                 if platform_str == "ios":
-                                    preview_info = preview_data.get(network_key, {})
-                                    mapped_params = preview_info.get("params", {})
-                                    android_package_for_unit = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                    if "ios_ad_unit_identifier" in st.session_state:
+                                        # Use user-selected value
+                                        android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                    else:
+                                        # Fallback: try to get from mapped_params
+                                        preview_info = preview_data.get(network_key, {})
+                                        mapped_params = preview_info.get("params", {})
+                                        android_package_for_unit = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
+                                        # Extract last part if it's a full package name
+                                        if android_package_for_unit and '.' in android_package_for_unit:
+                                            android_package_for_unit = android_package_for_unit.split('.')[-1]
                                 
                                 # Generate unit names
                                 from components.create_app_helpers import generate_slot_name
@@ -1405,118 +1821,6 @@ def render_new_create_app_ui():
                     
                     # Get preview_data from session state
                     preview_data = st.session_state.get("preview_data", {})
-                    
-                    # Helper function to extract app info from response
-                    def extract_app_info_from_response(network_key, response, mapped_params):
-                        """Extract app info (appId, appCode, gameId, etc.) from create app response"""
-                        if not response or not isinstance(response, dict):
-                            return None
-                        
-                        result = response.get('result', {})
-                        if not result:
-                            result = response
-                        
-                        app_info = {}
-                        
-                        # Network-specific extraction
-                        if network_key == "ironsource":
-                            # IronSource: appKey from result
-                            app_info["appKey"] = result.get("appKey") or response.get("appKey")
-                            app_info["appCode"] = app_info["appKey"]
-                        elif network_key == "mintegral":
-                            # Mintegral: app_id from result.result
-                            app_id = result.get("app_id") or result.get("id") or result.get("appId")
-                            app_info["appId"] = app_id
-                            app_info["appCode"] = str(app_id) if app_id else None
-                        elif network_key == "inmobi":
-                            # InMobi: appId from result.data or result
-                            data = result.get("data", {}) if isinstance(result.get("data"), dict) else result
-                            app_id = data.get("appId") or data.get("id") or result.get("appId")
-                            app_info["appId"] = app_id
-                            app_info["appCode"] = str(app_id) if app_id else None
-                        elif network_key == "bigoads":
-                            # BigOAds: appCode from result.result
-                            app_code = result.get("appCode") or response.get("appCode")
-                            app_info["appCode"] = app_code
-                        elif network_key == "fyber":
-                            # Fyber: appId from result.result
-                            app_id = result.get("appId") or result.get("id")
-                            app_info["appId"] = app_id
-                            app_info["appCode"] = str(app_id) if app_id else None
-                        elif network_key == "unity":
-                            # Unity: gameId from result.result.stores
-                            stores = result.get("stores", {})
-                            apple_store = stores.get("apple", {}) if isinstance(stores.get("apple"), dict) else {}
-                            google_store = stores.get("google", {}) if isinstance(stores.get("google"), dict) else {}
-                            apple_game_id = apple_store.get("gameId")
-                            google_game_id = google_store.get("gameId")
-                            project_id = result.get("id")
-                            app_info["apple_gameId"] = apple_game_id
-                            app_info["google_gameId"] = google_game_id
-                            app_info["project_id"] = project_id
-                            app_info["appCode"] = str(apple_game_id) if apple_game_id else (str(google_game_id) if google_game_id else str(project_id) if project_id else None)
-                        elif network_key == "pangle":
-                            # Pangle: app_id from result.result (normalized response structure)
-                            result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
-                            app_id = result_data.get("app_id")
-                            app_info["appId"] = app_id
-                            app_info["siteId"] = app_id
-                            app_info["appCode"] = str(app_id) if app_id else None
-                        elif network_key == "vungle":
-                            # Vungle: vungleAppId from result (response is the app object itself)
-                            result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else result
-                            vungle_app_id = result_data.get("vungleAppId") or result_data.get("id")
-                            app_info["vungleAppId"] = vungle_app_id
-                            app_info["appId"] = vungle_app_id
-                            app_info["appCode"] = str(vungle_app_id) if vungle_app_id else None
-                            app_info["platform"] = result_data.get("platform", "")  # "ios" or "android"
-                            app_info["name"] = result_data.get("name", "")
-                            
-                            # Extract platform-specific package name/bundle ID from mapped_params
-                            platform_value = result_data.get("platform", "").lower()
-                            if platform_value == "android":
-                                app_info["pkgName"] = mapped_params.get("android_store_id", mapped_params.get("androidPackageName", ""))
-                                app_info["platformStr"] = "android"
-                            elif platform_value == "ios":
-                                app_info["bundleId"] = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
-                                app_info["pkgName"] = ""  # iOS doesn't use pkgName
-                                app_info["platformStr"] = "ios"
-                        else:
-                            # Default: try common fields
-                            app_code = result.get("appCode") or result.get("appId") or result.get("appKey") or result.get("id")
-                            app_info["appCode"] = app_code
-                        
-                        # Add common fields
-                        app_info["name"] = result.get("name") or mapped_params.get("name") or mapped_params.get("app_name") or "Unknown"
-                        
-                        # Extract platform-specific package name and bundle ID for all networks
-                        # Android: use package name, iOS: use bundle ID
-                        platform_str = mapped_params.get("platformStr") or mapped_params.get("platform", "android")
-                        platform_value = platform_str.lower() if isinstance(platform_str, str) else "android"
-                        
-                        # For multi-platform networks, extract from platform-specific fields in mapped_params
-                        if network_key in ["ironsource", "inmobi", "bigoads", "fyber", "mintegral", "pangle"]:
-                            # Try to get from platform-specific fields first
-                            if platform_value == "android" or "Android" in str(platform_str):
-                                app_info["pkgName"] = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("package", ""))))
-                                app_info["bundleId"] = ""  # Android doesn't use bundleId
-                                app_info["platformStr"] = "android"
-                            elif platform_value == "ios" or "iOS" in str(platform_str) or "IOS" in str(platform_str):
-                                app_info["pkgName"] = ""  # iOS doesn't use pkgName
-                                app_info["bundleId"] = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("bundle", mapped_params.get("bundleId", "")))))
-                                app_info["platformStr"] = "ios"
-                            else:
-                                # Fallback: try generic fields
-                                app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
-                                app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
-                                app_info["platformStr"] = platform_value
-                        else:
-                            # Single platform or other networks: use generic fields
-                            app_info["pkgName"] = mapped_params.get("pkgName") or mapped_params.get("package", "")
-                            app_info["bundleId"] = mapped_params.get("bundleId") or mapped_params.get("bundle", "")
-                            app_info["platformStr"] = platform_value
-                        
-                        return app_info if app_info.get("appCode") else None
                     
                     # Get successfully created apps from session state and responses
                     # For multi-platform networks, we need to check results list
@@ -1738,6 +2042,16 @@ def render_new_create_app_ui():
                                         # Generate unit names for RV, IS, BN
                                         ios_units = {}
                                         for slot_type, ad_format in [("rv", "REWARD"), ("is", "INTER"), ("bn", "BANNER")]:
+                                            # Use user-selected identifier if available for AppLovin iOS units
+                                            android_package_for_applovin = None
+                                            if "ios_ad_unit_identifier" in st.session_state:
+                                                android_package_for_applovin = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                            else:
+                                                android_package_for_applovin = android_package if android_package else None
+                                                # Extract last part if it's a full package name
+                                                if android_package_for_applovin and '.' in android_package_for_applovin:
+                                                    android_package_for_applovin = android_package_for_applovin.split('.')[-1]
+                                            
                                             unit_name = generate_slot_name(
                                                 "",  # pkg_name is empty for iOS
                                                 "ios",
@@ -1746,7 +2060,7 @@ def render_new_create_app_ui():
                                                 bundle_id=ios_bundle_id,
                                                 network_manager=network_manager,
                                                 app_name=app_name,
-                                                android_package_name=android_package if android_package else None
+                                                android_package_name=android_package_for_applovin
                                             ) or f"{app_name}_{ad_format.lower()}"
                                             ios_units[ad_format] = {
                                                 "name": unit_name,
@@ -2070,7 +2384,14 @@ def render_new_create_app_ui():
                                         pkg_name = ""
                                         bundle_id = mapped_params.get("ios_store_id", mapped_params.get("iosAppId", ""))
                                         platform_str_for_unit = "ios"
-                                        android_package_for_unit = android_package if android_package else None  # Use Android package for iOS if available
+                                        # Use user-selected identifier if available
+                                        if "ios_ad_unit_identifier" in st.session_state:
+                                            android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                        else:
+                                            android_package_for_unit = android_package if android_package else None
+                                            # Extract last part if it's a full package name
+                                            if android_package_for_unit and '.' in android_package_for_unit:
+                                                android_package_for_unit = android_package_for_unit.split('.')[-1]
                                     else:
                                         continue
                                     

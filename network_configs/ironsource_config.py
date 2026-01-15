@@ -15,36 +15,91 @@ class IronSourceConfig(NetworkConfig):
         return "IronSource"
     
     def _get_taxonomies(self) -> List[Tuple[str, str]]:
-        """Get taxonomy (sub-genre) options"""
-        # Convert display name to API value (lowercase, replace spaces/special chars with underscores)
-        def to_api_value(display: str) -> str:
-            # Convert to lowercase and replace spaces/special chars
-            value = display.lower()
-            value = value.replace(" ", "_")
-            value = value.replace("/", "_")
-            value = value.replace("'", "")
-            value = value.replace(".", "")
-            value = value.replace("-", "_")
-            return value
+        """Get taxonomy (sub-genre) options
         
+        Returns:
+            List of (display_name, api_value) tuples where api_value is the exact value
+            expected by IronSource API (as provided in the API documentation)
+        """
+        # API values as provided in IronSource taxonomy documentation
+        # Format: (display_name, api_value)
+        # Note: API values match exactly what IronSource expects
         taxonomy_list = [
-            "Bingo", "Blackjack", "Non-Poker Cards", "Poker", "Slots", "Sports Betting", "Other Casino",
-            "AR/Location Based", "Endless Runner", "Idler", "Other Arcade", "Platformer", "Shoot 'em Up", "Tower Defense", ".io",
-            "Ball", "Dexterity", "Idle", "Merge", "Other", "Puzzle", "Rising/Falling", "Stacking", "Swerve", "Tap / Timing", "Turning",
-            "Kids & Family", "Customization", "Interactive Story", "Music/Band", "Other Lifestyle",
-            "Lucky Casino", "Lucky Game Discovery", "Lucky Puzzle", "Other Casual",
-            "Action Puzzle", "Board", "Bubble Shooter", "Coloring Games", "Crossword", "Hidden Objects", "Jigsaw", "Match 3", "Non Casino Card Game", "Other Puzzle", "Solitaire", "Trivia", "Word",
-            "Adventures", "Breeding", "Cooking/Time Management", "Farming", "Idle Simulation", "Other Simulation", "Sandbox", "Tycoon/Crafting",
-            "Card Battler", "Other Mid-Core",
-            "Action RPG", "Fighting", "Idle RPG", "MMORPG", "Other RPG", "Puzzle RPG", "Survival", "Turn-based RPG",
-            "Battle Royale", "Classic FPS", "Other Shooter", "Snipers", "Tactical Shooter",
-            "4X Strategy", "Build & Battle", "Idle Strategy", "MOBA", "Other Strategy", "Sync. Battler",
-            "Books & Reference", "Comics", "Communications", "Dating", "Education", "Entertainment", "Events & Tickets", "Finance", "Food & Drink", "Health & Fitness", "Lifestyle", "Maps & Navigation", "Medical", "Music & Audio", "News & Magazines", "Other Non-Gaming", "Parenting", "Personalization", "Photography", "Real Estate & Home", "Marketplace", "Shopping", "Social", "Sports",
-            "Bike", "Car Sharing", "Taxi/Ride Sharing", "Travel & Local", "Travel Air & Hotel", "Other Sports & Racing",
-            "Casual Racing", "Other Racing", "Simulation Racing", "Casual Sports", "Licensed Sports"
+            ("Stacking", "stacking"),
+            ("Dexterity", "dexterity"),
+            ("Rising/Falling", "rising/falling"),
+            ("Swerve", "swerve"),
+            ("Merge", "merge"),
+            ("Idle", "idle"),
+            (".io", ".io"),
+            ("Puzzle", "puzzle"),
+            ("Tap/Timing", "tap/Timing"),
+            ("Turning", "turning"),
+            ("Ball", "ball"),
+            ("Other", "other"),
+            ("AR/Location Based", "aR/locationBased"),
+            ("Action Puzzle", "actionPuzzle"),
+            ("Match 3", "match3"),
+            ("Bubble Shooter", "bubbleShooter"),
+            ("Jigsaw", "jigsaw"),
+            ("Crossword", "crossword"),
+            ("Word", "word"),
+            ("Trivia", "trivia"),
+            ("Board", "board"),
+            ("Coloring Games", "coloring Games"),
+            ("Hidden Objects", "hidden Objects"),
+            ("Solitaire", "solitaire"),
+            ("Non Casino Card Game", "nonCasinoCardGame"),
+            ("Other Puzzle", "otherPuzzle"),
+            ("Platformer", "platformer"),
+            ("Idler", "idler"),
+            ("Shoot 'em Up", "shootEmUp"),
+            ("Endless Runner", "endlessRunner"),
+            ("Tower Defense", "towerDefense"),
+            ("Other Arcade", "otherArcade"),
+            ("Customization", "customization"),
+            ("Interactive Story", "interactiveStory"),
+            ("Music/Band", "music/band"),
+            ("Other Lifestyle", "otherLifestyle"),
+            ("Adventures", "adventures"),
+            ("Breeding", "breeding"),
+            ("Tycoon/Crafting", "tycoon/crafting"),
+            ("Sandbox", "sandbox"),
+            ("Cooking/Time Management", "cooking/timeManagement"),
+            ("Farming", "farming"),
+            ("Idle Simulation", "idleSimulation"),
+            ("Other Simulation", "otherSimulation"),
+            ("Kids & Family", "kids&Family"),
+            ("Other Casual", "otherCasual"),
+            ("Battle Royale", "battleRoyale"),
+            ("Classic FPS", "classicFPS"),
+            ("Snipers", "snipers"),
+            ("Tactical Shooter", "tacticalShooter"),
+            ("Other Shooter", "otherShooter"),
+            ("Action RPG", "actionRPG"),
+            ("Turn-based RPG", "turnBasedRPG"),
+            ("Fighting", "fighting"),
+            ("MMORPG", "MMORPG"),
+            ("Puzzle RPG", "puzzleRPG"),
+            ("Survival", "survival"),
+            ("Idle RPG", "idleRPG"),
+            ("Other RPG", "otherRPG"),
+            ("Card Battler", "cardBattler"),
+            ("4X Strategy", "4xStrategy"),
+            ("Build & Battle", "build&Battle"),
+            ("MOBA", "MOBA"),
+            ("Sync Battler", "syncBattler"),
+            ("Other Strategy", "otherStrategy"),
+            ("Other Mid-Core", "otherMidCore"),
+            ("Casual Sports", "casualSports"),
+            ("Licensed Sports", "licensedSports"),
+            ("Casual Racing", "casualRacing"),
+            ("Simulation Racing", "simulationRacing"),
+            ("Other Racing", "otherRacing"),
+            ("Other Sports & Racing", "otherSports&Racing"),
         ]
         
-        return [(display, to_api_value(display)) for display in taxonomy_list]
+        return taxonomy_list
     
     def _get_ad_formats(self) -> List[Tuple[str, str]]:
         """Get ad format options for placements"""
@@ -306,11 +361,22 @@ class IronSourceConfig(NetworkConfig):
         else:
             store_url = form_data.get("androidStoreUrl", "").strip()
         
+        app_name = form_data.get("appName", "").strip()
+        taxonomy = form_data.get("taxonomy", "").strip()
+        
+        # Validate required fields
+        if not app_name:
+            raise ValueError(f"IronSource {platform} payload: appName is required but was empty or None")
+        if not store_url:
+            raise ValueError(f"IronSource {platform} payload: storeUrl is required but was empty or None")
+        if not taxonomy:
+            raise ValueError(f"IronSource {platform} payload: taxonomy is required but was empty or None")
+        
         payload = {
-            "appName": form_data.get("appName"),
+            "appName": app_name,
             "platform": platform,  # "iOS" or "Android"
             "storeUrl": store_url,
-            "taxonomy": form_data.get("taxonomy"),
+            "taxonomy": taxonomy,
             "coppa": form_data.get("coppa", 0),
         }
         

@@ -38,26 +38,63 @@ class IronSourceAPI(BaseNetworkAPI):
         try:
             response = self._make_request("POST", url, headers=headers, json_data=payload)
             
-            # Check for 401 Unauthorized - token might be expired
-            if response.status_code == 401:
-                self.logger.warning("[IronSource] Received 401 Unauthorized. Token may be expired. Attempting to refresh...")
+            # Check for error status codes before raise_for_status
+            if response.status_code >= 400:
+                # Log detailed error information
+                self.logger.error(f"[IronSource] HTTP {response.status_code} Error Response")
+                self.logger.error(f"[IronSource] Error Response Headers: {dict(response.headers)}")
+                try:
+                    error_body = response.json()
+                    self.logger.error(f"[IronSource] Error Response Body: {json.dumps(error_body, indent=2)}")
+                    error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or response.text
+                    error_code = error_body.get("code") or error_body.get("errorCode") or str(response.status_code)
+                except:
+                    error_msg = response.text or f"HTTP {response.status_code}"
+                    error_code = str(response.status_code)
+                    self.logger.error(f"[IronSource] Error Response Text: {error_msg}")
                 
-                # Try to refresh token
-                refresh_token = get_env_var("IRONSOURCE_REFRESH_TOKEN")
-                secret_key = get_env_var("IRONSOURCE_SECRET_KEY")
-                
-                if refresh_token and secret_key:
-                    new_token = self.auth.refresh_token(refresh_token, secret_key)
-                    if new_token:
-                        # Retry request with new token
-                        self.logger.info("[IronSource] Retrying request with refreshed token...")
-                        headers["Authorization"] = f"Bearer {new_token}"
-                        response = self._make_request("POST", url, headers=headers, json_data=payload)
-                        self.logger.info(f"[IronSource] Retry Response Status: {response.status_code}")
+                # For 401, try token refresh
+                if response.status_code == 401:
+                    self.logger.warning("[IronSource] Received 401 Unauthorized. Token may be expired. Attempting to refresh...")
+                    
+                    # Try to refresh token
+                    refresh_token = get_env_var("IRONSOURCE_REFRESH_TOKEN")
+                    secret_key = get_env_var("IRONSOURCE_SECRET_KEY")
+                    
+                    if refresh_token and secret_key:
+                        new_token = self.auth.refresh_token(refresh_token, secret_key)
+                        if new_token:
+                            # Retry request with new token
+                            self.logger.info("[IronSource] Retrying request with refreshed token...")
+                            headers["Authorization"] = f"Bearer {new_token}"
+                            response = self._make_request("POST", url, headers=headers, json_data=payload)
+                            self.logger.info(f"[IronSource] Retry Response Status: {response.status_code}")
+                            
+                            # Check if retry succeeded
+                            if response.status_code >= 400:
+                                try:
+                                    retry_error_body = response.json()
+                                    retry_error_msg = retry_error_body.get("message") or retry_error_body.get("msg") or retry_error_body.get("error") or response.text
+                                    retry_error_code = retry_error_body.get("code") or retry_error_body.get("errorCode") or str(response.status_code)
+                                except:
+                                    retry_error_msg = response.text or f"HTTP {response.status_code}"
+                                    retry_error_code = str(response.status_code)
+                                
+                                return {
+                                    "status": 1,
+                                    "code": retry_error_code,
+                                    "msg": retry_error_msg
+                                }
+                        else:
+                            self.logger.error("[IronSource] Token refresh failed. Please check IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY")
                     else:
-                        self.logger.error("[IronSource] Token refresh failed. Please check IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY")
-                else:
-                    self.logger.error("[IronSource] No refresh token available. Please set IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY in .env file")
+                        self.logger.error("[IronSource] No refresh token available. Please set IRONSOURCE_REFRESH_TOKEN and IRONSOURCE_SECRET_KEY in .env file")
+                
+                return {
+                    "status": 1,
+                    "code": error_code,
+                    "msg": error_msg
+                }
             
             response.raise_for_status()
             
@@ -85,16 +122,36 @@ class IronSourceAPI(BaseNetworkAPI):
             }
         except requests.exceptions.RequestException as e:
             self.logger.error(f"[IronSource] API Error (Create App): {str(e)}")
+            
+            # Enhanced error logging
+            error_msg = str(e)
+            error_code = "API_ERROR"
+            
             if hasattr(e, 'response') and e.response is not None:
+                response = e.response
+                self.logger.error(f"[IronSource] Error Response Status: {response.status_code}")
+                self.logger.error(f"[IronSource] Error Response Headers: {dict(response.headers)}")
+                
+                # Try to get detailed error message from response
                 try:
-                    error_body = e.response.json()
-                    self.logger.error(f"[IronSource] Error Response: {json.dumps(error_body, indent=2)}")
+                    error_body = response.json()
+                    self.logger.error(f"[IronSource] Error Response Body (JSON): {json.dumps(error_body, indent=2)}")
+                    
+                    # Extract error message from response body
+                    if isinstance(error_body, dict):
+                        error_msg = error_body.get("message") or error_body.get("msg") or error_body.get("error") or error_msg
+                        error_code = error_body.get("code") or error_body.get("errorCode") or error_code
                 except:
-                    self.logger.error(f"[IronSource] Error Response (text): {e.response.text}")
+                    # Response is not JSON
+                    error_text = response.text
+                    self.logger.error(f"[IronSource] Error Response Body (text): {error_text}")
+                    if error_text:
+                        error_msg = error_text[:500]  # Limit length
+                        
             return {
                 "status": 1,
-                "code": "API_ERROR",
-                "msg": str(e)
+                "code": error_code,
+                "msg": error_msg
             }
     
     def create_unit(self, payload: Dict, app_key: Optional[str] = None) -> Dict:

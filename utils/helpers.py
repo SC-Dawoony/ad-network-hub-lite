@@ -4,6 +4,10 @@ import json
 import logging
 from typing import Dict, Optional, Any, List
 import streamlit as st
+from dotenv import load_dotenv
+
+# Load .env file when module is imported
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
