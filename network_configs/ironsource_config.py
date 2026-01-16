@@ -440,4 +440,8 @@ class IronSourceConfig(NetworkConfig):
             ad_unit["settings"] = [settings]
         
         return ad_unit
+    
+    def supports_create_unit(self) -> bool:
+        """IronSource supports unit creation via API, but we don't show unit payloads in Create App Simple"""
+        return False
 

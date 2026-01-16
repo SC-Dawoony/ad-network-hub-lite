@@ -113,7 +113,10 @@ def normalize_platform_str(platform_value: str, network: str = None) -> str:
     return "android"
 
 
-def get_bigoads_pkg_name_display(pkg_name: str, bundle_id: str, network_manager, app_name: str = None, platform_str: str = None) -> str:
+# Cache for BigOAds apps to avoid repeated API calls during preview generation
+_bigoads_apps_cache = None
+
+def get_bigoads_pkg_name_display(pkg_name: str, bundle_id: str, network_manager, app_name: str = None, platform_str: str = None, use_cache: bool = True) -> str:
     """Get BigOAds pkgNameDisplay by matching package name or bundleId
     
     For iOS apps with iTunes ID (id123456), try to find Android version of the same app
@@ -125,11 +128,14 @@ def get_bigoads_pkg_name_display(pkg_name: str, bundle_id: str, network_manager,
         network_manager: Network manager instance to fetch BigOAds apps
         app_name: App name for matching (optional, used when pkg_name is iTunes ID)
         platform_str: Platform string ("android" or "ios") for filtering
+        use_cache: Whether to use cached BigOAds apps (default: True, for preview generation)
     
     Returns:
         BigOAds pkgNameDisplay if found, otherwise returns empty string for iTunes ID,
         or original pkg_name/bundle_id for valid package names
     """
+    global _bigoads_apps_cache
+    
     if not pkg_name and not bundle_id:
         return ""
     
@@ -142,8 +148,15 @@ def get_bigoads_pkg_name_display(pkg_name: str, bundle_id: str, network_manager,
     is_itunes_id = search_key.startswith("id") and search_key[2:].isdigit()
     
     try:
-        # Fetch BigOAds apps
-        bigoads_apps = network_manager.get_apps("bigoads")
+        # Use cache if available and use_cache is True
+        if use_cache and _bigoads_apps_cache is not None:
+            bigoads_apps = _bigoads_apps_cache
+        else:
+            # Fetch BigOAds apps
+            bigoads_apps = network_manager.get_apps("bigoads")
+            # Cache the result for subsequent calls during preview generation
+            if use_cache:
+                _bigoads_apps_cache = bigoads_apps
         
         if is_itunes_id:
             # For iTunes ID, try to find Android version of the same app by app name

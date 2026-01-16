@@ -440,4 +440,8 @@ class PangleConfig(NetworkConfig):
                 payload["accept_material_type"] = form_data.get("accept_material_type")
         
         return payload
+    
+    def supports_create_unit(self) -> bool:
+        """Pangle supports unit creation via API"""
+        return True
 

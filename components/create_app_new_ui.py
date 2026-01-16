@@ -1057,6 +1057,12 @@ def render_new_create_app_ui():
             # Store in session state so it's available after button click
             if "preview_data" not in st.session_state:
                 st.session_state.preview_data = {}
+            
+            # Clear BigOAds apps cache at the start of preview generation
+            # This ensures we fetch fresh data once per preview generation and reuse it
+            from components import create_app_helpers
+            create_app_helpers._bigoads_apps_cache = None
+            
             preview_data = {}
             has_errors = False
             
@@ -1280,7 +1286,8 @@ def render_new_create_app_ui():
                                     android_package_name=android_package_for_unit if android_package_for_unit else None
                                 )
                                 
-                                if slot_name:
+                                # For Pangle, create payload even if slot_name is empty (slot_name is not required)
+                                if slot_name or network_key == "pangle":
                                     # Build unit payload with placeholder for appCode/appId/site_id
                                     # Each network has different required parameters
                                     if network_key == "bigoads":
@@ -1455,6 +1462,10 @@ def render_new_create_app_ui():
                         "params": mapped_params,
                         "unit_payloads": unit_payloads  # Add unit payloads
                     }
+            
+            # Clear BigOAds apps cache after preview generation is complete
+            from components import create_app_helpers
+            create_app_helpers._bigoads_apps_cache = None
             
             # Store preview_data in session state
             st.session_state.preview_data = preview_data
