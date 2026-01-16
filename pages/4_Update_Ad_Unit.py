@@ -2092,27 +2092,24 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     for suffix in suffixes_to_remove:
                                         if normalized_app_name.lower().endswith(suffix):
                                             normalized_app_name = normalized_app_name[:-len(suffix)].strip()
-                                            logger.info(f"[Mintegral iOS] Normalized app_name from '{app_name_from_unit}' to '{normalized_app_name}'")
+                                            logger.debug(f"[Mintegral iOS] Normalized app_name from '{app_name_from_unit}' to '{normalized_app_name}'")
                                             break
                                     
                                     # Use normalized app name for matching
                                     app_name_from_unit = normalized_app_name if normalized_app_name else app_name_from_unit
                                     
-                                    logger.info(f"[Mintegral iOS] Standard matching failed, trying Android app first strategy")
-                                    logger.info(f"[Mintegral iOS] package_name: {package_name}, app_name (normalized): {app_name_from_unit}")
+                                    logger.info(f"[Mintegral iOS] Trying Android app first strategy (package_name: {package_name}, app_name: {app_name_from_unit})")
                                     
                                     # Strategy: Find Android app by package_name, then find iOS app with same name
                                     # Mintegral iOS apps use iTunes ID format (id{number}) in package field, not actual package_name
                                     # So we need to find Android version first to get the correct app_name
                                     if package_name:
                                         # First, try to find Android app by package_name
-                                        logger.info(f"[Mintegral iOS] Step 1: Finding Android app by package_name: '{package_name}'")
                                         android_app = find_app_by_package_name(actual_network, package_name, "android")
                                         if android_app:
                                             android_app_name = android_app.get("name") or android_app.get("appName") or android_app.get("app_name", "")
                                             android_app_id = android_app.get("app_id") or android_app.get("id", "")
-                                            logger.info(f"[Mintegral iOS] Found Android app by package_name: '{package_name}'")
-                                            logger.info(f"[Mintegral iOS] Android app name: '{android_app_name}', app_id: {android_app_id}")
+                                            logger.debug(f"[Mintegral iOS] Found Android app: name='{android_app_name}', app_id={android_app_id}")
                                             
                                             # Strategy: Check app_id ±1 for iOS app with matching app_name
                                             # Mintegral often assigns consecutive app_ids to Android and iOS versions of the same app
@@ -2127,7 +2124,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                     if all_apps:
                                                         # Check app_id - 1, app_id, app_id + 1
                                                         candidate_ids = [android_app_id_int - 1, android_app_id_int, android_app_id_int + 1]
-                                                        logger.info(f"[Mintegral iOS] Step 2: Checking app_ids {candidate_ids} for iOS app with matching name")
+                                                        logger.debug(f"[Mintegral iOS] Checking app_ids {candidate_ids} for iOS app with matching name")
                                                         
                                                         for candidate_id in candidate_ids:
                                                             if candidate_id == android_app_id_int:
@@ -2155,9 +2152,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                                                 ios_app_id = candidate_id
                                                                                 ios_app_package = app.get("package", "") or app.get("pkgName", "")
                                                                                 matched_app = app
-                                                                                logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_id ±1 strategy")
-                                                                                logger.info(f"[Mintegral iOS] Android app_id: {android_app_id_int}, iOS app_id: {ios_app_id}")
-                                                                                logger.info(f"[Mintegral iOS] iOS app name: '{app_name_in_list}', package: {ios_app_package}")
+                                                                                logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_id ±1 (Android: {android_app_id_int} → iOS: {ios_app_id}, name: '{app_name_in_list}')")
                                                                                 break
                                                             
                                                             if matched_app:
@@ -2174,12 +2169,12 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                             
                                             # Fallback: Try to find iOS app by app_name first, then find Android app by app_id ±1
                                             if app_name_from_unit:
-                                                logger.info(f"[Mintegral iOS] Fallback: Finding iOS app by app_name: '{app_name_from_unit}'")
+                                                logger.debug(f"[Mintegral iOS] Fallback: Finding iOS app by app_name: '{app_name_from_unit}'")
                                                 ios_app = find_app_by_name(actual_network, app_name_from_unit, "ios")
                                                 if ios_app:
                                                     ios_app_id = ios_app.get("app_id") or ios_app.get("id", "")
                                                     ios_app_package = ios_app.get("package", "") or ios_app.get("pkgName", "")
-                                                    logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_name: '{app_name_from_unit}' (app_id: {ios_app_id}, package: {ios_app_package})")
+                                                    logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_name: '{app_name_from_unit}' (app_id: {ios_app_id})")
                                                     
                                                     # Now try to find Android app by app_id ±1 from iOS app_id
                                                     if ios_app_id:
@@ -2192,7 +2187,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                             if all_apps:
                                                                 # Check app_id - 1, app_id, app_id + 1
                                                                 candidate_ids = [ios_app_id_int - 1, ios_app_id_int, ios_app_id_int + 1]
-                                                                logger.info(f"[Mintegral iOS] Checking app_ids {candidate_ids} for Android app with matching name")
+                                                                logger.debug(f"[Mintegral iOS] Checking app_ids {candidate_ids} for Android app with matching name")
                                                                 
                                                                 for candidate_id in candidate_ids:
                                                                     if candidate_id == ios_app_id_int:
@@ -2218,9 +2213,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                                                         ios_name_lower in app_name_lower or 
                                                                                         app_name_lower in ios_name_lower):
                                                                                         android_app_id = candidate_id
-                                                                                        logger.info(f"[Mintegral iOS] ✅ Found Android app by app_id ±1 from iOS app_id")
-                                                                                        logger.info(f"[Mintegral iOS] iOS app_id: {ios_app_id_int}, Android app_id: {android_app_id}")
-                                                                                        logger.info(f"[Mintegral iOS] Android app name: '{app_name_in_list}'")
+                                                                                        logger.debug(f"[Mintegral iOS] Found Android app by app_id ±1 (iOS: {ios_app_id_int} → Android: {android_app_id}, name: '{app_name_in_list}')")
                                                                                         break
                                                                     
                                                                     if matched_app:
@@ -2231,7 +2224,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                     matched_app = ios_app
                                     elif app_name_from_unit:
                                         # Fallback: Try direct app_name matching with iOS platform
-                                        logger.info(f"[Mintegral iOS] Fallback: Trying direct app_name matching: '{app_name_from_unit}'")
+                                        logger.debug(f"[Mintegral iOS] Fallback: Trying direct app_name matching: '{app_name_from_unit}'")
                                         ios_app = find_app_by_name(actual_network, app_name_from_unit, "ios")
                                         if ios_app:
                                             ios_app_id = ios_app.get("app_id") or ios_app.get("id", "")
@@ -2250,15 +2243,8 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     
                                     # Debug logging for Mintegral
                                     if actual_network == "mintegral":
-                                        logger.info(f"[Mintegral] ========== Debug Info ==========")
-                                        logger.info(f"[Mintegral] Platform: {applovin_unit.get('platform')}")
-                                        logger.info(f"[Mintegral] Ad Format: {applovin_unit.get('ad_format')}")
-                                        logger.info(f"[Mintegral] Matched app: {matched_app.get('name', 'N/A')}")
-                                        logger.info(f"[Mintegral] Matched app keys: {list(matched_app.keys())}")
-                                        logger.info(f"[Mintegral] Matched app app_id: {matched_app.get('app_id', 'N/A')}, id: {matched_app.get('id', 'N/A')}")
-                                        logger.info(f"[Mintegral] Matched app platform: {matched_app.get('platform', 'N/A')}")
-                                        logger.info(f"[Mintegral] Extracted app_ids: {app_ids}")
-                                        logger.info(f"[Mintegral] Extracted app_id: {app_id}, app_key: {app_key}, app_code: {app_ids.get('app_code')}")
+                                        logger.debug(f"[Mintegral] Matched app: {matched_app.get('name', 'N/A')}, app_id: {matched_app.get('app_id', 'N/A')}, platform: {matched_app.get('platform', 'N/A')}")
+                                        logger.debug(f"[Mintegral] Extracted app_id: {app_id}, app_key: {app_key}, app_code: {app_ids.get('app_code')}")
                                     
                                     # For BigOAds, ensure app_key is set (fallback to app_id if app_code is missing)
                                     # Also handle case where app_code is "N/A" or empty string
@@ -2327,18 +2313,16 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     
                                     # Debug logging for Mintegral before get_network_units
                                     if actual_network == "mintegral":
-                                        logger.info(f"[Mintegral] Before get_network_units: unit_lookup_id={unit_lookup_id}, app_id={app_id}, app_key={app_key}")
+                                        logger.debug(f"[Mintegral] Getting units: unit_lookup_id={unit_lookup_id}, app_id={app_id}, app_key={app_key}")
                                     
                                     units = get_network_units(actual_network, unit_lookup_id)
                                     
                                     # Debug logging for Mintegral units
                                     if actual_network == "mintegral":
-                                        logger.info(f"[Mintegral] Units count: {len(units) if units else 0}")
                                         if units:
-                                            logger.info(f"[Mintegral] First unit keys: {list(units[0].keys())}")
+                                            logger.debug(f"[Mintegral] Retrieved {len(units)} units")
                                         else:
-                                            logger.warning(f"[Mintegral] No units returned from API!")
-                                            logger.warning(f"[Mintegral] unit_lookup_id used: {unit_lookup_id}")
+                                            logger.warning(f"[Mintegral] No units returned from API (unit_lookup_id: {unit_lookup_id})")
                                     
                                     # Debug logging for BigOAds units
                                     if actual_network == "bigoads":
@@ -2367,19 +2351,11 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                         
                                         # Debug logging for Mintegral unit matching
                                         if actual_network == "mintegral":
-                                            logger.info(f"[Mintegral] ========== Unit Matching ==========")
-                                            logger.info(f"[Mintegral] Ad format: {applovin_unit['ad_format']}")
-                                            logger.info(f"[Mintegral] Platform: {applovin_unit['platform']}")
-                                            logger.info(f"[Mintegral] Total units available: {len(units)}")
-                                            if units:
-                                                logger.info(f"[Mintegral] All units ad_type: {[u.get('ad_type') for u in units]}")
-                                                logger.info(f"[Mintegral] All units placement_name: {[u.get('placement_name') for u in units]}")
                                             if matched_unit:
-                                                logger.info(f"[Mintegral] Matched unit placement_name: {matched_unit.get('placement_name', 'N/A')}")
-                                                logger.info(f"[Mintegral] Matched unit placement_id: {matched_unit.get('placement_id', 'N/A')}, id: {matched_unit.get('id', 'N/A')}")
-                                                logger.info(f"[Mintegral] Matched unit all keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[Mintegral] ✅ Matched unit: {matched_unit.get('placement_name', 'N/A')} (placement_id: {matched_unit.get('placement_id', 'N/A')})")
                                             else:
-                                                logger.warning(f"[Mintegral] No unit matched!")
+                                                logger.warning(f"[Mintegral] ⚠️ No unit matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} units)")
+                                                logger.debug(f"[Mintegral] Available units ad_type: {[u.get('ad_type') for u in units]}")
                                         
                                         # Debug logging for Vungle
                                         if actual_network == "vungle":
