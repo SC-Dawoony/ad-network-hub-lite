@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 def create_ad_units_immediately(network_key: str, network_display: str, app_response: dict, mapped_params: dict, 
                                  platform: str, config, network_manager, app_name: str):
     """Create ad units immediately after app creation success
+    Automatically deactivates existing ad units before creating new ones.
     
     Args:
         network_key: Network identifier (e.g., "bigoads", "inmobi")
@@ -42,6 +43,130 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
     app_code = app_info.get("appCode") or app_info.get("appId") or app_info.get("appKey")
     if not app_code:
         return created_units
+    
+    # Step 1: Deactivate existing ad units (if needed)
+    # This must be done before creating new units to avoid conflicts
+    try:
+        if network_key == "ironsource":
+            # IronSource: Deactivate existing ad units
+            from utils.ad_network_query import get_ironsource_units
+            
+            app_key = app_info.get("appKey") or app_code
+            if app_key:
+                with st.spinner(f"⏸️ {network_display} - {platform}: 기존 Ad Units 비활성화 중..."):
+                    existing_units = get_ironsource_units(app_key)
+                    
+                    if existing_units:
+                        deactivate_payloads = []
+                        for unit in existing_units:
+                            mediation_adunit_id = unit.get("mediationAdUnitId") or unit.get("mediationAdunitId") or unit.get("id")
+                            if mediation_adunit_id:
+                                deactivate_payloads.append({
+                                    "mediationAdUnitId": str(mediation_adunit_id).strip(),
+                                    "isPaused": True
+                                })
+                        
+                        if deactivate_payloads:
+                            deactivate_response = network_manager._update_ironsource_ad_units(app_key, deactivate_payloads)
+                            if deactivate_response.get("status") == 0:
+                                st.success(f"✅ {network_display} - {platform}: {len(deactivate_payloads)}개 기존 Ad Units 비활성화 완료!")
+                                logger.info(f"[{network_display}] Deactivated {len(deactivate_payloads)} existing ad units for {platform}")
+                            else:
+                                st.warning(f"⚠️ {network_display} - {platform}: 기존 Ad Units 비활성화 실패 (계속 진행)")
+                                logger.warning(f"[{network_display}] Failed to deactivate existing ad units for {platform}: {deactivate_response.get('msg', 'Unknown error')}")
+                        else:
+                            logger.info(f"[{network_display}] No existing ad units to deactivate for {platform}")
+                    else:
+                        logger.info(f"[{network_display}] No existing ad units found for {platform}")
+        
+        elif network_key == "vungle":
+            # Vungle: Deactivate existing placements
+            vungle_app_id = app_info.get("vungleAppId") or app_code
+            if vungle_app_id:
+                with st.spinner(f"⏸️ {network_display} - {platform}: 기존 Placements 비활성화 중..."):
+                    try:
+                        existing_placements = network_manager._get_vungle_placements_by_app_id(str(vungle_app_id))
+                        for placement in existing_placements:
+                            initial_placement_id = placement.get("id")
+                            if initial_placement_id:
+                                # Get full placement details to get accurate ID
+                                placement_details = network_manager._vungle_api.get_placement(str(initial_placement_id))
+                                if placement_details and placement_details.get("result"):
+                                    placement_id = placement_details["result"].get("id")
+                                    if placement_id:
+                                        # Deactivate placement
+                                        deactivate_response = network_manager._vungle_api.update_placement(
+                                            str(placement_id),
+                                            {"isActive": False}
+                                        )
+                                        if deactivate_response and deactivate_response.get("code") == 0:
+                                            logger.info(f"[Vungle] Deactivated placement {placement_id} for {platform}")
+                        
+                        if existing_placements:
+                            st.success(f"✅ {network_display} - {platform}: {len(existing_placements)}개 기존 Placements 비활성화 완료!")
+                    except Exception as e:
+                        logger.warning(f"[Vungle] Failed to deactivate existing placements for {platform}: {str(e)}")
+                        st.warning(f"⚠️ {network_display} - {platform}: 기존 Placements 비활성화 실패 (계속 진행)")
+        
+        elif network_key == "unity":
+            # Unity: Archive existing ad units
+            # Unity stores project_id and stores (apple/google) in app_info
+            project_id = app_info.get("project_id") or app_info.get("projectId")
+            if project_id:
+                # Map platform to store_name: "iOS" -> "apple", "Android" -> "google"
+                platform_lower = platform.lower()
+                if platform_lower == "ios":
+                    target_stores = ["apple"]
+                    platform_display = "iOS"
+                elif platform_lower == "android":
+                    target_stores = ["google"]
+                    platform_display = "Android"
+                else:
+                    # If platform is not specified, archive both stores
+                    target_stores = ["apple", "google"]
+                    platform_display = platform
+                
+                with st.spinner(f"📦 {network_display} - {platform_display}: 기존 Ad Units Archive 중..."):
+                    try:
+                        # Get existing ad units from API
+                        ad_units_dict = network_manager._get_unity_ad_units(project_id)
+                        
+                        if ad_units_dict:
+                            archived_count = 0
+                            # Archive ad units for target stores only
+                            for store_name in target_stores:
+                                if store_name in ad_units_dict and ad_units_dict[store_name]:
+                                    ad_units = ad_units_dict[store_name]
+                                    
+                                    # Build archive payload: {ad_unit_id: {"archive": True}}
+                                    archive_payload = {}
+                                    for ad_unit_id, ad_unit_data in ad_units.items():
+                                        archive_payload[ad_unit_id] = {
+                                            "archive": True
+                                        }
+                                    
+                                    if archive_payload:
+                                        # Archive ad units for this store
+                                        archive_response = network_manager._update_unity_ad_units(project_id, store_name, archive_payload)
+                                        if archive_response.get("status") == 0:
+                                            archived_count += len(archive_payload)
+                                            store_display = "iOS" if store_name == "apple" else "Android"
+                                            logger.info(f"[Unity] Archived {len(archive_payload)} ad units for {store_display} (project_id: {project_id})")
+                                        else:
+                                            logger.warning(f"[Unity] Failed to archive ad units for {store_name}: {archive_response.get('msg', 'Unknown error')}")
+                            
+                            if archived_count > 0:
+                                st.success(f"✅ {network_display} - {platform_display}: {archived_count}개 기존 Ad Units Archive 완료!")
+                            else:
+                                logger.info(f"[Unity] No existing ad units to archive for {platform_display} (project_id: {project_id})")
+                        else:
+                            logger.info(f"[Unity] No existing ad units found for project {project_id}")
+                    except Exception as e:
+                        logger.warning(f"[Unity] Failed to archive existing ad units for {platform_display}: {str(e)}")
+                        st.warning(f"⚠️ {network_display} - {platform_display}: 기존 Ad Units Archive 실패 (계속 진행)")
+    except Exception as e:
+        logger.warning(f"[{network_display}] Error deactivating existing ad units for {platform}: {str(e)}")
+        st.warning(f"⚠️ {network_display} - {platform}: 기존 Ad Units 비활성화 중 오류 발생 (계속 진행)")
     
     # Try to use pre-prepared unit payloads from preview_data
     preview_data = st.session_state.get("preview_data", {})
