@@ -2085,10 +2085,23 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     package_name = applovin_unit.get("package_name", "")
                                     app_name_from_unit = applovin_unit.get("name", "")
                                     
+                                    # Normalize AppLovin app name: remove platform and ad format suffixes
+                                    # e.g., "Theme Park Manager iOS BN" -> "Theme Park Manager"
+                                    normalized_app_name = app_name_from_unit
+                                    suffixes_to_remove = [" ios rv", " ios is", " ios bn", " ios", " android rv", " android is", " android bn", " android"]
+                                    for suffix in suffixes_to_remove:
+                                        if normalized_app_name.lower().endswith(suffix):
+                                            normalized_app_name = normalized_app_name[:-len(suffix)].strip()
+                                            logger.info(f"[Mintegral iOS] Normalized app_name from '{app_name_from_unit}' to '{normalized_app_name}'")
+                                            break
+                                    
+                                    # Use normalized app name for matching
+                                    app_name_from_unit = normalized_app_name if normalized_app_name else app_name_from_unit
+                                    
                                     logger.info(f"[Mintegral iOS] Standard matching failed, trying Android app first strategy")
-                                    logger.info(f"[Mintegral iOS] package_name: {package_name}, app_name: {app_name_from_unit}")
+                                    logger.info(f"[Mintegral iOS] package_name: {package_name}, app_name (normalized): {app_name_from_unit}")
                                     st.write(f"🔍 [Mintegral iOS] Standard matching failed, trying Android app first strategy")
-                                    st.write(f"🔍 [Mintegral iOS] package_name: {package_name}, app_name: {app_name_from_unit}")
+                                    st.write(f"🔍 [Mintegral iOS] package_name: {package_name}, app_name (normalized): {app_name_from_unit}")
                                     
                                     # Strategy: Find Android app by package_name, then find iOS app with same name
                                     # Mintegral iOS apps use iTunes ID format (id{number}) in package field, not actual package_name
