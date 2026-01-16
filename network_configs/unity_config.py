@@ -185,6 +185,10 @@ class UnityConfig(NetworkConfig):
         
         return payload
     
+    def supports_create_unit(self) -> bool:
+        """Unity does not support unit creation via API"""
+        return False
+    
     def build_unit_payload(self, form_data: Dict) -> Dict:
         """Unity does not support unit creation via API"""
         return {}

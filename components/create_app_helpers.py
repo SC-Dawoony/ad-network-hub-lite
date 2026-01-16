@@ -224,30 +224,62 @@ def generate_slot_name(pkg_name: str, platform_str: str, slot_type: str, network
     # Normalize platform_str first
     normalized_platform = normalize_platform_str(platform_str, network)
     
-    # For iOS: prioritize android_package_name if provided
-    if normalized_platform == "ios" and android_package_name:
+    # Prioritize android_package_name if provided (for both Android and iOS)
+    # This allows using selected App match name for consistent naming across platforms
+    if android_package_name:
         source_pkg_name = android_package_name
+    elif normalized_platform == "ios":
+        # For iOS without android_package_name, use bundle_id
+        source_pkg_name = bundle_id if bundle_id else (pkg_name if pkg_name else "")
     else:
+        # For Android without android_package_name, use pkg_name
         # Get package name (prefer BigOAds pkgNameDisplay)
         # If pkg_name is empty, use bundle_id as fallback
         source_pkg_name = pkg_name if pkg_name else (bundle_id if bundle_id else "")
     
     final_pkg_name = source_pkg_name
     
-    # For Mintegral, skip BigOAds lookup (pkg_name should already be resolved from apps list)
-    # Mintegral should use its own app list for package name resolution
-    if network.lower() != "mintegral" and network_manager and (pkg_name or bundle_id):
+    # If android_package_name is provided (selected App match name), skip BigOAds lookup
+    # This ensures consistent naming across platforms using the selected App match name
+    # For Mintegral, also skip BigOAds lookup (pkg_name should already be resolved from apps list)
+    # For Vungle iOS, skip BigOAds lookup to avoid using iTunesId
+    should_skip_bigoads_lookup = (
+        android_package_name or  # Selected App match name has highest priority
+        network.lower() == "mintegral" or  # Mintegral uses its own app list
+        (network.lower() == "vungle" and normalized_platform == "ios")  # Vungle iOS should not use iTunesId
+    )
+    
+    if not should_skip_bigoads_lookup and network_manager and (pkg_name or bundle_id):
         bigoads_pkg = get_bigoads_pkg_name_display(pkg_name, bundle_id, network_manager, app_name, platform_str)
         if bigoads_pkg:
             final_pkg_name = bigoads_pkg
         elif not bigoads_pkg and source_pkg_name and source_pkg_name.startswith("id") and source_pkg_name[2:].isdigit():
             # iTunes ID but couldn't find Android version - this should not happen if app_name is provided
-            # Return empty to avoid using iTunes ID
-            logger.warning(f"Could not find package name for iTunes ID: {source_pkg_name}. App name: {app_name}")
-            return ""
+            # For Vungle iOS, avoid using iTunesId - fallback to bundle_id or Android package name
+            if network.lower() == "vungle" and normalized_platform == "ios":
+                # Use bundle_id if available, otherwise return empty to avoid iTunesId
+                if bundle_id:
+                    final_pkg_name = bundle_id
+                else:
+                    logger.warning(f"Vungle iOS: Could not find bundle_id, avoiding iTunesId: {source_pkg_name}")
+                    return ""
+            else:
+                # For other networks, return empty to avoid using iTunes ID
+                logger.warning(f"Could not find package name for iTunes ID: {source_pkg_name}. App name: {app_name}")
+                return ""
         elif not bigoads_pkg and bundle_id and not pkg_name:
             # If pkg_name was empty but bundle_id exists, use bundle_id
-            final_pkg_name = bundle_id
+            # But for Vungle iOS, avoid using iTunesId (bundle_id might be iTunesId)
+            if network.lower() == "vungle" and normalized_platform == "ios" and bundle_id.startswith("id") and bundle_id[2:].isdigit():
+                # This is iTunesId, skip it
+                logger.warning(f"Vungle iOS: bundle_id appears to be iTunesId, skipping: {bundle_id}")
+                # Try to use Android package name if available
+                if android_package_name:
+                    final_pkg_name = android_package_name
+                else:
+                    return ""
+            else:
+                final_pkg_name = bundle_id
     
     # If final_pkg_name is still empty, return empty string
     if not final_pkg_name:

@@ -65,7 +65,15 @@ def create_ad_units_immediately(network_key: str, network_display: str, app_resp
                     if isinstance(obj, dict):
                         for key, value in obj.items():
                             if isinstance(value, str) and "{APP_CODE}" in value:
-                                obj[key] = value.replace("{APP_CODE}", str(app_code).strip())
+                                replaced_value = value.replace("{APP_CODE}", str(app_code).strip())
+                                # For Mintegral, convert app_id to integer
+                                if network_key == "mintegral" and key == "app_id":
+                                    try:
+                                        obj[key] = int(replaced_value)
+                                    except (ValueError, TypeError):
+                                        obj[key] = replaced_value
+                                else:
+                                    obj[key] = replaced_value
                             elif isinstance(value, (dict, list)):
                                 replace_app_code(value)
                     elif isinstance(obj, list):
@@ -904,9 +912,9 @@ def render_new_create_app_ui():
                     if network_key not in selected_networks:
                         selected_networks.append(network_key)
                 elif network_key in selected_networks:
-                    # If unchecked, remove from selected_networks
-                    selected_networks.remove(network_key)
-    
+                        # If unchecked, remove from selected_networks
+                            selected_networks.remove(network_key)
+        
         st.session_state.selected_networks = selected_networks
         
         if not selected_networks:
@@ -1081,34 +1089,61 @@ def render_new_create_app_ui():
                             platform_lower = platform_str.lower()
                             
                             # Get package name/bundle ID for unit name generation
+                            # Use user-selected App match name for both Android and iOS if available
+                            selected_app_match_name = None
+                            if "ios_ad_unit_identifier" in st.session_state:
+                                selected_app_match_name = st.session_state.ios_ad_unit_identifier.get("value", None)
+                            
                             if platform_lower == "android":
-                                pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
-                                if not pkg_name and network_key == "inmobi":
-                                    android_info = st.session_state.get("store_info_android", {})
-                                    if android_info:
-                                        pkg_name = android_info.get("package_name", "")
-                                bundle_id = ""
-                                android_package_for_unit = None
+                                # For Android, use selected App match name if available, otherwise use package name
+                                if selected_app_match_name:
+                                    # Use selected App match name (already lowercase)
+                                    pkg_name = selected_app_match_name
+                                    bundle_id = ""
+                                else:
+                                    # Fallback to package name
+                                    pkg_name = mapped_params.get("android_package", mapped_params.get("androidPkgName", mapped_params.get("android_store_id", mapped_params.get("androidBundle", ""))))
+                                    if not pkg_name and network_key == "inmobi":
+                                        android_info = st.session_state.get("store_info_android", {})
+                                        if android_info:
+                                            pkg_name = android_info.get("package_name", "")
+                                    bundle_id = ""
+                                
+                                # Always use selected App match name for unit name generation (for consistency)
+                                android_package_for_unit = selected_app_match_name
                             else:  # iOS
                                 pkg_name = ""
-                                bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
-                                if not bundle_id and network_key == "inmobi":
+                                # For Vungle iOS, avoid using iTunesId (ios_store_id might be iTunesId)
+                                # Use bundle_id directly from store_info_ios
+                                if network_key == "vungle":
                                     ios_info = st.session_state.get("store_info_ios", {})
                                     if ios_info:
-                                        bundle_id = ios_info.get("bundle_id", "")
-                                
-                                # For iOS, use user-selected identifier if available
-                                android_package_for_unit = None
-                                if "ios_ad_unit_identifier" in st.session_state:
-                                    android_package_for_unit = st.session_state.ios_ad_unit_identifier.get("value", None)
+                                        bundle_id = ios_info.get("bundle_id", "")  # Use bundle_id, not iTunesId
+                                    else:
+                                        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosBundle", ""))
                                 else:
+                                    bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                    if not bundle_id and network_key == "inmobi":
+                                        ios_info = st.session_state.get("store_info_ios", {})
+                                        if ios_info:
+                                            bundle_id = ios_info.get("bundle_id", "")
+                                
+                                # For iOS, prioritize user-selected identifier (App match name)
+                                # If not selected, use Android package name
+                                if selected_app_match_name:
+                                    android_package_for_unit = selected_app_match_name
+                                else:
+                                    # Fallback: try to use Android package name if available
                                     android_package_for_unit = mapped_params.get("android_package", mapped_params.get("androidPkgName", ""))
                                     if android_package_for_unit and '.' in android_package_for_unit:
-                                        android_package_for_unit = android_package_for_unit.split('.')[-1]
+                                        android_package_for_unit = android_package_for_unit.split('.')[-1].lower()
                             
                             # Generate unit payloads for RV, IS, BN
                             platform_unit_payloads = {}
                             for slot_type in ["rv", "is", "bn"]:
+                                # Use selected App match name for both Android and iOS if available
+                                # For Android: pass as android_package_name to ensure consistent naming
+                                # For iOS: pass as android_package_name (already prioritized in generate_slot_name)
                                 slot_name = generate_slot_name(
                                     pkg_name,
                                     platform_lower,
@@ -1117,11 +1152,12 @@ def render_new_create_app_ui():
                                     bundle_id=bundle_id,
                                     network_manager=network_manager,
                                     app_name=app_name,
-                                    android_package_name=android_package_for_unit if platform_lower == "ios" else None
+                                    android_package_name=android_package_for_unit if android_package_for_unit else None
                                 )
                                 
                                 if slot_name:
-                                    # Build unit payload with placeholder for appCode
+                                    # Build unit payload with placeholder for appCode/appId/site_id
+                                    # Each network has different required parameters
                                     if network_key == "bigoads":
                                         unit_payload = {
                                             "appCode": "{APP_CODE}",  # Placeholder
@@ -1133,15 +1169,147 @@ def render_new_create_app_ui():
                                             unit_payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
                                         elif slot_type.lower() == "bn":
                                             unit_payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
+                                    elif network_key == "ironsource":
+                                        # IronSource: mediationAdUnitName, adFormat
+                                        ad_format_map = {
+                                            "rv": "rewarded",
+                                            "is": "interstitial",
+                                            "bn": "banner"
+                                        }
+                                        ad_format = ad_format_map.get(slot_type.lower(), "rewarded")
+                                        unit_payload = {
+                                            "mediationAdUnitName": slot_name,
+                                            "adFormat": ad_format,
+                                        }
+                                        # Add reward for rewarded format
+                                        if ad_format == "rewarded":
+                                            unit_payload["reward"] = {
+                                                "rewardItemName": "Reward",
+                                                "rewardAmount": 1
+                                            }
+                                    elif network_key == "pangle":
+                                        # Pangle: site_id, bidding_type, ad_slot_type
+                                        ad_slot_type_map = {
+                                            "rv": 5,  # Rewarded Video
+                                            "is": 6,  # Interstitial
+                                            "bn": 2   # Banner
+                                        }
+                                        ad_slot_type = ad_slot_type_map.get(slot_type.lower(), 5)
+                                        unit_payload = {
+                                            "site_id": "{APP_CODE}",  # Placeholder
+                                            "bidding_type": 1,  # Default: Bidding
+                                            "ad_slot_type": ad_slot_type,
+                                        }
+                                        # Add type-specific fields
+                                        if ad_slot_type == 5:  # Rewarded Video
+                                            unit_payload.update({
+                                                "render_type": 1,
+                                                "orientation": 1,
+                                                "reward_is_callback": 0,
+                                                "reward_name": "Reward",
+                                                "reward_count": 1,
+                                            })
+                                        elif ad_slot_type == 6:  # Interstitial
+                                            unit_payload.update({
+                                                "render_type": 1,
+                                                "orientation": 1,
+                                            })
+                                        elif ad_slot_type == 2:  # Banner
+                                            unit_payload.update({
+                                                "render_type": 1,
+                                                "slide_banner": 1,
+                                                "width": 640,
+                                                "height": 100,
+                                            })
+                                    elif network_key == "mintegral":
+                                        # Mintegral: app_id, placement_name, ad_type
+                                        ad_type_map = {
+                                            "rv": "rewarded_video",
+                                            "is": "new_interstitial",
+                                            "bn": "banner"
+                                        }
+                                        ad_type = ad_type_map.get(slot_type.lower(), "rewarded_video")
+                                        unit_payload = {
+                                            "app_id": "{APP_CODE}",  # Placeholder (will be replaced)
+                                            "placement_name": slot_name,
+                                            "ad_type": ad_type,
+                                            "integrate_type": "sdk",
+                                        }
+                                        # Add type-specific fields
+                                        if ad_type == "rewarded_video":
+                                            unit_payload["skip_time"] = -1  # Non Skippable
+                                        elif ad_type == "new_interstitial":
+                                            unit_payload.update({
+                                                "content_type": "both",
+                                                "ad_space_type": 1,
+                                                "skip_time": -1,
+                                            })
+                                        elif ad_type == "banner":
+                                            unit_payload.update({
+                                                "show_close_button": 0,
+                                                "auto_fresh": 0,
+                                            })
+                                    elif network_key == "inmobi":
+                                        # InMobi: appId, placementName, placementType
+                                        placement_type_map = {
+                                            "rv": "REWARDED_VIDEO",
+                                            "is": "INTERSTITIAL",
+                                            "bn": "BANNER"
+                                        }
+                                        placement_type = placement_type_map.get(slot_type.lower(), "INTERSTITIAL")
+                                        unit_payload = {
+                                            "appId": "{APP_CODE}",  # Placeholder
+                                            "placementName": slot_name,
+                                            "placementType": placement_type,
+                                            "isAudienceBiddingEnabled": False,
+                                        }
+                                    elif network_key == "fyber":
+                                        # Fyber: name, appId, placementType
+                                        placement_type_map = {
+                                            "rv": "Rewarded",
+                                            "is": "Interstitial",
+                                            "bn": "Banner"
+                                        }
+                                        placement_type = placement_type_map.get(slot_type.lower(), "Rewarded")
+                                        unit_payload = {
+                                            "name": slot_name,
+                                            "appId": "{APP_CODE}",  # Placeholder
+                                            "placementType": placement_type,
+                                            "coppa": False,
+                                        }
+                                    elif network_key == "vungle":
+                                        # Vungle: name, adFormat (platform and package_name will be added separately)
+                                        ad_format_map = {
+                                            "rv": "Rewarded",
+                                            "is": "Interstitial",
+                                            "bn": "Banner"
+                                        }
+                                        ad_format = ad_format_map.get(slot_type.lower(), "Rewarded")
+                                        unit_payload = {
+                                            "name": slot_name,
+                                            "adFormat": ad_format,
+                                        }
                                     else:
-                                        # Use config.build_unit_payload if available
+                                        # For other networks, try config.build_unit_payload if available
                                         if hasattr(config, 'build_unit_payload'):
                                             try:
-                                                unit_payload = config.build_unit_payload({
-                                                    "appCode": "{APP_CODE}",  # Placeholder
+                                                # Map slot_type to network-specific format
+                                                unit_payload_data = {
+                                                    "appCode": "{APP_CODE}",  # Placeholder (generic)
                                                     "name": slot_name,
                                                     "slotType": slot_type.lower()
-                                                })
+                                                }
+                                                # Try to map to network-specific field names
+                                                if network_key in ["inmobi", "mintegral", "pangle"]:
+                                                    # These networks use different field names
+                                                    if network_key == "inmobi":
+                                                        unit_payload_data["appId"] = "{APP_CODE}"
+                                                    elif network_key == "mintegral":
+                                                        unit_payload_data["app_id"] = "{APP_CODE}"
+                                                    elif network_key == "pangle":
+                                                        unit_payload_data["site_id"] = "{APP_CODE}"
+                                                
+                                                unit_payload = config.build_unit_payload(unit_payload_data)
                                             except Exception as e:
                                                 logger.warning(f"Failed to build unit payload for {network_key} {platform_str} {slot_type}: {str(e)}")
                                                 continue
@@ -1312,7 +1480,7 @@ def render_new_create_app_ui():
                                             st.success(f"✅ {network_display} - Android 앱 생성 성공!")
                                             if is_success:
                                                 success_count += 1
-                                                
+                                            
                                                 # Immediately create ad units after app creation success
                                                 create_ad_units_immediately(
                                                     network_key, network_display, android_response, mapped_params,
@@ -1376,7 +1544,7 @@ def render_new_create_app_ui():
                                             st.success(f"✅ {network_display} - iOS 앱 생성 성공!")
                                             if is_success:
                                                 success_count += 1
-                                                
+                                            
                                                 # Immediately create ad units after app creation success
                                                 create_ad_units_immediately(
                                                     network_key, network_display, ios_response, mapped_params,
@@ -1426,7 +1594,7 @@ def render_new_create_app_ui():
                                         platform_params = mapped_params.copy()
                                         _process_create_app_result(
                                             network_key, network_display, platform_params, result
-                                        )
+                                    )
                                 elif network_key == "mintegral":
                                     # Mintegral: process each platform separately
                                     for platform, result, response in results:
@@ -2870,9 +3038,9 @@ def render_new_create_app_ui():
                                 unit_names = {}
                                 for slot_type in ["rv", "is", "bn"]:
                                     slot_name = generate_slot_name(
-                                        pkg_name,
-                                        platform_str,
-                                        slot_type,
+                                        pkg_name, 
+                                        platform_str, 
+                                        slot_type, 
                                         network_key,
                                         bundle_id=bundle_id,
                                         network_manager=network_manager,
@@ -2880,117 +3048,116 @@ def render_new_create_app_ui():
                                     )
                                     if slot_name:
                                         unit_names[slot_type.upper()] = slot_name
-                            
-                            if unit_names:
-                                st.markdown("##### ✅ Create Ad Units")
-                                st.markdown("**생성될 Unit 이름:**")
                                 
-                                unit_cols = st.columns(len(unit_names))
-                                for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
-                                    with unit_cols[idx]:
-                                        st.text_input(
-                                            f"{slot_type} Unit Name",
-                                            value=slot_name,
-                                            key=f"unit_name_{network_key}_{slot_type}",
-                                            disabled=True
-                                        )
-                                
-                                # Create buttons for each unit type
-                                create_unit_cols = st.columns(len(unit_names))
-                                for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
-                                    with create_unit_cols[idx]:
-                                        if st.button(
-                                            f"✅ Create {slot_type}",
-                                            key=f"create_unit_{network_key}_{slot_type}",
-                                            use_container_width=True
-                                        ):
-                                            # Ensure created_apps_by_network is preserved in session state
-                                            if "created_apps_by_network" not in st.session_state:
-                                                st.session_state.created_apps_by_network = created_apps_by_network
-                                            else:
-                                                # Merge with existing data
-                                                st.session_state.created_apps_by_network.update(created_apps_by_network)
-                                            
-                                            try:
-                                                # Build payload and call API directly instead of using create_default_slot
-                                                # to avoid UI rendering issues that cause page reload
-                                                app_code = app_info.get("appCode") or app_info.get("appId") or app_info.get("appKey")
-                                                if not app_code:
-                                                    st.error(f"❌ {slot_type} Unit 생성 실패: App Code를 찾을 수 없습니다.")
-                                                    logger.error(f"App Code not found for {network_key}: {app_info}")
+                                if unit_names:
+                                    st.markdown("##### ✅ Create Ad Units")
+                                    st.markdown("**생성될 Unit 이름:**")
+                                    
+                                    unit_cols = st.columns(len(unit_names))
+                                    for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
+                                        with unit_cols[idx]:
+                                            st.text_input(
+                                                f"{slot_type} Unit Name",
+                                                value=slot_name,
+                                                key=f"unit_name_{network_key}_{slot_type}",
+                                                disabled=True
+                                            )
+                                    
+                                    # Create buttons for each unit type
+                                    create_unit_cols = st.columns(len(unit_names))
+                                    for idx, (slot_type, slot_name) in enumerate(unit_names.items()):
+                                        with create_unit_cols[idx]:
+                                            if st.button(
+                                                f"✅ Create {slot_type}",
+                                                key=f"create_unit_{network_key}_{slot_type}",
+                                                use_container_width=True
+                                            ):
+                                                # Ensure created_apps_by_network is preserved in session state
+                                                if "created_apps_by_network" not in st.session_state:
+                                                    st.session_state.created_apps_by_network = created_apps_by_network
                                                 else:
-                                                    # Build payload based on network
-                                                    if network_key == "bigoads":
-                                                        payload = {
-                                                            "appCode": str(app_code).strip(),
-                                                            "name": slot_name,
-                                                        }
-                                                        if slot_type.lower() == "rv":
-                                                            payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
-                                                        elif slot_type.lower() == "is":
-                                                            payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
-                                                        elif slot_type.lower() == "bn":
-                                                            payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
+                                                    # Merge with existing data
+                                                    st.session_state.created_apps_by_network.update(created_apps_by_network)
+                                                
+                                                try:
+                                                    # Build payload and call API directly instead of using create_default_slot
+                                                    # to avoid UI rendering issues that cause page reload
+                                                    app_code = app_info.get("appCode") or app_info.get("appId") or app_info.get("appKey")
+                                                    if not app_code:
+                                                        st.error(f"❌ {slot_type} Unit 생성 실패: App Code를 찾을 수 없습니다.")
+                                                        logger.error(f"App Code not found for {network_key}: {app_info}")
                                                     else:
-                                                        # For other networks, try to use config.build_unit_payload if available
-                                                        if hasattr(config, 'build_unit_payload'):
-                                                            payload = config.build_unit_payload({
-                                                                "appCode": str(app_code).strip(),
-                                                                "name": slot_name,
-                                                                "slotType": slot_type.lower()
-                                                            })
-                                                        else:
-                                                            # Fallback: basic payload
+                                                        # Build payload based on network
+                                                        if network_key == "bigoads":
                                                             payload = {
                                                                 "appCode": str(app_code).strip(),
                                                                 "name": slot_name,
                                                             }
-                                                    
-                                                    # Make API call
-                                                    with st.spinner(f"Creating {slot_type.upper()} unit..."):
-                                                        response = network_manager.create_unit(network_key, payload)
-                                                        
-                                                        # Check response
-                                                        is_success = response.get('status') == 0 or response.get('code') == 0
-                                                        
-                                                        # Track unit creation result
-                                                        platform_str = app_info.get("platformStr", "android")
-                                                        platform_display = "Android" if platform_str.lower() == "android" else "iOS"
-                                                        if network_key not in st.session_state.creation_results:
-                                                            st.session_state.creation_results[network_key] = {"network": platform_display, "apps": [], "units": []}
-                                                        st.session_state.creation_results[network_key]["units"].append({
-                                                            "platform": platform_display,
-                                                            "app_name": app_info.get("name", "Unknown"),
-                                                            "unit_name": slot_name,
-                                                            "unit_type": slot_type.upper(),
-                                                            "success": is_success
-                                                        })
-                                                        
-                                                        if is_success:
-                                                            st.success(f"✅ {slot_type} Unit 생성 완료!")
+                                                            if slot_type.lower() == "rv":
+                                                                payload.update({"adType": 4, "auctionType": 3, "musicSwitch": 1})
+                                                            elif slot_type.lower() == "is":
+                                                                payload.update({"adType": 3, "auctionType": 3, "musicSwitch": 1})
+                                                            elif slot_type.lower() == "bn":
+                                                                payload.update({"adType": 2, "auctionType": 3, "bannerAutoRefresh": 2, "bannerSize": [2]})
                                                         else:
-                                                            error_msg = response.get("msg", "Unknown error") if response else "No response"
-                                                            st.error(f"❌ {slot_type} Unit 생성 실패: {error_msg}")
-                                                            logger.error(f"Failed to create {slot_type} unit for {network_key}: {error_msg}")
-                                            except Exception as e:
-                                                # Track unit creation failure
-                                                platform_str = app_info.get("platformStr", "android")
-                                                platform_display = "Android" if platform_str.lower() == "android" else "iOS"
-                                                if network_key not in st.session_state.creation_results:
-                                                    st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
-                                                st.session_state.creation_results[network_key]["units"].append({
-                                                    "platform": platform_display,
-                                                    "app_name": app_info.get("name", "Unknown"),
-                                                    "unit_name": slot_name,
-                                                    "unit_type": slot_type.upper(),
-                                                    "success": False,
-                                                    "error": str(e)
-                                                })
-                                                
-                                                st.error(f"❌ {slot_type} Unit 생성 실패: {str(e)}")
-                                                logger.error(f"Error creating {slot_type} unit for {network_key}: {str(e)}", exc_info=True)
-                            else:
-                                st.warning(f"⚠️ {network_display}: Unit 이름을 생성할 수 없습니다.")
+                                                            # For other networks, try to use config.build_unit_payload if available
+                                                            if hasattr(config, 'build_unit_payload'):
+                                                                payload = config.build_unit_payload({
+                                                                    "appCode": str(app_code).strip(),
+                                                                    "name": slot_name,
+                                                                    "slotType": slot_type.lower()
+                                                                })
+                                                            else:
+                                                                # Fallback: basic payload
+                                                                payload = {
+                                                                    "appCode": str(app_code).strip(),
+                                                                    "name": slot_name,
+                                                                }
+                                                        
+                                                        # Make API call
+                                                        with st.spinner(f"Creating {slot_type.upper()} unit..."):
+                                                            response = network_manager.create_unit(network_key, payload)
+                                                            
+                                                            # Check response
+                                                            is_success = response.get('status') == 0 or response.get('code') == 0
+                                                            
+                                                            # Track unit creation result
+                                                            platform_str = app_info.get("platformStr", "android")
+                                                            platform_display = "Android" if platform_str.lower() == "android" else "iOS"
+                                                            if network_key not in st.session_state.creation_results:
+                                                                st.session_state.creation_results[network_key] = {"network": platform_display, "apps": [], "units": []}
+                                                            st.session_state.creation_results[network_key]["units"].append({
+                                                                "platform": platform_display,
+                                                                "app_name": app_info.get("name", "Unknown"),
+                                                                "unit_name": slot_name,
+                                                                "unit_type": slot_type.upper(),
+                                                                "success": is_success
+                                                            })
+                                                            
+                                                            if is_success:
+                                                                st.success(f"✅ {slot_type} Unit 생성 완료!")
+                                                            else:
+                                                                error_msg = response.get("msg", "Unknown error") if response else "No response"
+                                                                st.error(f"❌ {slot_type} Unit 생성 실패: {error_msg}")
+                                                                logger.error(f"Failed to create {slot_type} unit for {network_key}: {error_msg}")
+                                                except Exception as e:
+                                                    # Track unit creation failure
+                                                    platform_str = app_info.get("platformStr", "android")
+                                                    platform_display = "Android" if platform_str.lower() == "android" else "iOS"
+                                                    if network_key not in st.session_state.creation_results:
+                                                        st.session_state.creation_results[network_key] = {"network": network_display, "apps": [], "units": []}
+                                                    st.session_state.creation_results[network_key]["units"].append({
+                                                        "platform": platform_display,
+                                                        "app_name": app_info.get("name", "Unknown"),
+                                                        "unit_name": slot_name,
+                                                        "unit_type": slot_type.upper(),
+                                                        "success": False,
+                                                        "error": str(e)
+                                                    })
+                                                    st.error(f"❌ {slot_type} Unit 생성 실패: {str(e)}")
+                                                    logger.error(f"Error creating {slot_type} unit for {network_key}: {str(e)}", exc_info=True)
+                                else:
+                                    st.warning(f"⚠️ {network_display}: Unit 이름을 생성할 수 없습니다.")
                             
                             st.markdown("---")
                 
