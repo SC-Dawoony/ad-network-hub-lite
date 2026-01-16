@@ -2486,6 +2486,11 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                         elif actual_network == "bigoads":
                                             # BigOAds uses slotCode for ad_unit_id
                                             unit_id = matched_unit.get("slotCode") or matched_unit.get("id") or ""
+                                            if unit_id:
+                                                logger.info(f"[BigOAds] ✅ Extracted unit_id: {unit_id} from slotCode or id")
+                                            else:
+                                                logger.warning(f"[BigOAds] ⚠️ Could not extract unit_id. Matched unit keys: {list(matched_unit.keys())}")
+                                                logger.warning(f"[BigOAds] Matched unit slotCode: {matched_unit.get('slotCode')}, id: {matched_unit.get('id')}")
                                         elif actual_network == "vungle":
                                             # Vungle uses referenceID as primary identifier for ad_unit_id
                                             unit_id = matched_unit.get("referenceID") or matched_unit.get("id") or matched_unit.get("placementId") or ""
@@ -2525,9 +2530,17 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                 matched_unit.get("adUnitId") or
                                                 matched_unit.get("unitId") or
                                                 matched_unit.get("placementId") or
-                                                matched_unit.get("id") or
-                                                ""
-                                            )
+                                                    matched_unit.get("id") or
+                                                    ""
+                                                )
+                                    else:
+                                        # matched_unit is None - unit matching failed
+                                        if actual_network == "bigoads":
+                                            logger.warning(f"[BigOAds] ⚠️ matched_unit is None - unit matching failed")
+                                            logger.warning(f"[BigOAds] This means no unit was matched for format={applovin_unit.get('ad_format')}, platform={applovin_unit.get('platform')}")
+                                            if units:
+                                                logger.warning(f"[BigOAds] Available units count: {len(units)}")
+                                                logger.debug(f"[BigOAds] Available units adType: {[u.get('adType') for u in units]}")
                                     
                                     # For IronSource, appKey goes to ad_network_app_id
                                     # For InMobi, use fixed value for ad_network_app_id and empty ad_network_app_key
@@ -2615,6 +2628,19 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                             st.write(f"⚠️ [BigOAds Debug] matched_app keys: {list(matched_app.keys()) if matched_app else []}")
                                         else:
                                             logger.info(f"[BigOAds] ✅ ad_network_app_id successfully set to: {ad_network_app_id}")
+                                        
+                                        # Debug logging for BigOAds unit_id
+                                        if not unit_id or unit_id.strip() == "":
+                                            logger.warning(f"[BigOAds] ⚠️ unit_id is EMPTY after extraction")
+                                            if matched_unit:
+                                                logger.warning(f"[BigOAds] Matched unit: {matched_unit}")
+                                                logger.warning(f"[BigOAds] Matched unit keys: {list(matched_unit.keys())}")
+                                                logger.warning(f"[BigOAds] Matched unit slotCode: {matched_unit.get('slotCode', 'N/A')}")
+                                                logger.warning(f"[BigOAds] Matched unit id: {matched_unit.get('id', 'N/A')}")
+                                            else:
+                                                logger.warning(f"[BigOAds] ⚠️ matched_unit is None - unit matching failed")
+                                        else:
+                                            logger.info(f"[BigOAds] ✅ unit_id successfully set to: {unit_id}")
                                     elif actual_network == "vungle":
                                         # Vungle uses vungleAppId from application object
                                         # app_id should already contain vungleAppId from match_applovin_unit_to_network
