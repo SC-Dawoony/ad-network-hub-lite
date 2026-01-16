@@ -1,8 +1,7 @@
-# Compatibility layer: Redirect to new API structure
-# This allows existing code to continue using the old import paths
-# TODO: Update all imports to use api.* instead of utils.network_apis.*
-
+"""API Layer - Network API clients"""
 from api.base import BaseNetworkAPI
+
+# Import all network APIs
 from api.networks.ironsource import IronSourceAPI
 from api.networks.bigoads import BigOAdsAPI
 from api.networks.mintegral import MintegralAPI
@@ -25,3 +24,4 @@ __all__ = [
     'PangleAPI',
     'VungleAPI',
 ]
+
