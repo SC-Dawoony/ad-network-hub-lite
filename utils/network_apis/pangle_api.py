@@ -324,7 +324,7 @@ class PangleAPI(BaseNetworkAPI):
         
         Args:
             payload: Unit creation payload
-            app_key: Not used for Pangle (site_id is in payload)
+            app_key: Not used for Pangle (app_id is in payload)
             
         Returns:
             API response dict

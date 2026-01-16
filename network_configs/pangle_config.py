@@ -200,13 +200,13 @@ class PangleConfig(NetworkConfig):
         """
         base_fields = [
             Field(
-                name="site_id",
+                name="app_id",
                 field_type="text",
                 required=True,
-                label="Site ID*",
-                placeholder="Enter site ID from Pangle platform",
-                help_text="Site ID from Pangle platform (from Create App response)",
-                default=SessionManager.get_last_created_app_info("pangle").get("siteId") if SessionManager.get_last_created_app_info("pangle") else ""
+                label="App ID*",
+                placeholder="Enter app ID from Pangle platform",
+                help_text="App ID from Pangle platform (from Create App response)",
+                default=SessionManager.get_last_created_app_info("pangle").get("appId") or SessionManager.get_last_created_app_info("pangle").get("app_id") if SessionManager.get_last_created_app_info("pangle") else ""
             ),
             Field(
                 name="ad_placement_type",
@@ -266,7 +266,7 @@ class PangleConfig(NetworkConfig):
     
     def validate_unit_data(self, data: Dict) -> Tuple[bool, str]:
         """Validate unit creation data"""
-        required_fields = ["site_id", "ad_placement_type"]
+        required_fields = ["app_id", "ad_placement_type"]
         
         for field in required_fields:
             if field not in data or data[field] is None or data[field] == "":
@@ -399,7 +399,7 @@ class PangleConfig(NetworkConfig):
         ad_slot_type = form_data.get("ad_placement_type")  # This is ad_slot_type in API
         
         payload = {
-            "site_id": form_data.get("site_id"),
+            "app_id": form_data.get("app_id"),
             "bidding_type": form_data.get("bidding_type", 1),  # Default: 1
             "ad_slot_type": ad_slot_type,
         }

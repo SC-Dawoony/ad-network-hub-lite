@@ -305,9 +305,26 @@ def generate_slot_name(pkg_name: str, platform_str: str, slot_type: str, network
     else:
         last_part = final_pkg_name
     
+    # If android_package_name (app match name) was used, ALWAYS convert to lowercase
+    # This ensures consistent lowercase naming when using app match name
+    # Apply to ALL networks including Vungle
+    if android_package_name:
+        last_part = last_part.lower()
+        # Double-check: ensure it's actually lowercase (defensive programming)
+        if last_part != last_part.lower():
+            logger.warning(f"{network}: last_part from app match name was not lowercase: {last_part}, forcing lowercase")
+            last_part = last_part.lower()
     # For IronSource and InMobi, ALWAYS convert last_part to lowercase (whether from pkg_name, bundle_id, or BigOAds pkgNameDisplay)
     # This ensures consistent lowercase naming for IronSource and InMobi ad units
-    if network.lower() in ["ironsource", "inmobi"]:
+    elif network.lower() in ["ironsource", "inmobi"]:
+        last_part = last_part.lower()
+        # Double-check: ensure it's actually lowercase (defensive programming)
+        if last_part != last_part.lower():
+            logger.warning(f"{network}: last_part was not lowercase: {last_part}, forcing lowercase")
+            last_part = last_part.lower()
+    # For Vungle, also ALWAYS convert to lowercase (even without app match name)
+    # This ensures consistent lowercase naming for Vungle ad units
+    elif network.lower() == "vungle":
         last_part = last_part.lower()
         # Double-check: ensure it's actually lowercase (defensive programming)
         if last_part != last_part.lower():

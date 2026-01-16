@@ -396,7 +396,8 @@ def extract_app_info_from_response(network_key, response, mapped_params):
         result_data = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
         app_id = result_data.get("app_id")
         app_info["appId"] = app_id
-        app_info["siteId"] = app_id
+        app_info["app_id"] = app_id  # Store as app_id for unit creation
+        app_info["siteId"] = app_id  # Keep siteId for backward compatibility
         app_info["appCode"] = str(app_id) if app_id else None
     elif network_key == "vungle":
         # Vungle: vungleAppId from result (response is the app object itself)
@@ -1243,21 +1244,31 @@ def render_new_create_app_ui():
                                 # Always use selected App match name for unit name generation (for consistency)
                                 android_package_for_unit = selected_app_match_name
                             else:  # iOS
-                                pkg_name = ""
-                                # For Vungle iOS, avoid using iTunesId (ios_store_id might be iTunesId)
-                                # Use bundle_id directly from store_info_ios
-                                if network_key == "vungle":
-                                    ios_info = st.session_state.get("store_info_ios", {})
-                                    if ios_info:
-                                        bundle_id = ios_info.get("bundle_id", "")  # Use bundle_id, not iTunesId
-                                    else:
-                                        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosBundle", ""))
-                                else:
-                                    bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
-                                    if not bundle_id and network_key == "inmobi":
+                                # For Pangle, use pkg_name from mapped_params (same as create_unit_common.py)
+                                if network_key == "pangle":
+                                    # Pangle iOS: use pkgName from mapped_params (create_unit_common.py logic)
+                                    pkg_name = mapped_params.get("ios_package", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                    if not pkg_name:
                                         ios_info = st.session_state.get("store_info_ios", {})
                                         if ios_info:
-                                            bundle_id = ios_info.get("bundle_id", "")
+                                            pkg_name = ios_info.get("package_name", "") or ios_info.get("bundle_id", "")
+                                    bundle_id = ""
+                                else:
+                                    pkg_name = ""
+                                    # For Vungle iOS, avoid using iTunesId (ios_store_id might be iTunesId)
+                                    # Use bundle_id directly from store_info_ios
+                                    if network_key == "vungle":
+                                        ios_info = st.session_state.get("store_info_ios", {})
+                                        if ios_info:
+                                            bundle_id = ios_info.get("bundle_id", "")  # Use bundle_id, not iTunesId
+                                        else:
+                                            bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosBundle", ""))
+                                    else:
+                                        bundle_id = mapped_params.get("ios_bundle_id", mapped_params.get("iosPkgName", mapped_params.get("ios_store_id", mapped_params.get("iosBundle", ""))))
+                                        if not bundle_id and network_key == "inmobi":
+                                            ios_info = st.session_state.get("store_info_ios", {})
+                                            if ios_info:
+                                                bundle_id = ios_info.get("bundle_id", "")
                                 
                                 # For iOS, prioritize user-selected identifier (App match name)
                                 # If not selected, use Android package name
@@ -1272,19 +1283,31 @@ def render_new_create_app_ui():
                             # Generate unit payloads for RV, IS, BN
                             platform_unit_payloads = {}
                             for slot_type in ["rv", "is", "bn"]:
-                                # Use selected App match name for both Android and iOS if available
-                                # For Android: pass as android_package_name to ensure consistent naming
-                                # For iOS: pass as android_package_name (already prioritized in generate_slot_name)
-                                slot_name = generate_slot_name(
-                                    pkg_name,
-                                    platform_lower,
-                                    slot_type,
-                                    network_key,
-                                    bundle_id=bundle_id,
-                                    network_manager=network_manager,
-                                    app_name=app_name,
-                                    android_package_name=android_package_for_unit if android_package_for_unit else None
-                                )
+                                # For Pangle, use the same logic as create_unit_common.py
+                                # (no android_package_name, no bundle_id to match the exact same generation logic)
+                                if network_key == "pangle":
+                                    slot_name = generate_slot_name(
+                                        pkg_name,
+                                        platform_lower,
+                                        slot_type,
+                                        network_key,
+                                        network_manager=network_manager,
+                                        app_name=app_name
+                                    )
+                                else:
+                                    # Use selected App match name for both Android and iOS if available
+                                    # For Android: pass as android_package_name to ensure consistent naming
+                                    # For iOS: pass as android_package_name (already prioritized in generate_slot_name)
+                                    slot_name = generate_slot_name(
+                                        pkg_name,
+                                        platform_lower,
+                                        slot_type,
+                                        network_key,
+                                        bundle_id=bundle_id,
+                                        network_manager=network_manager,
+                                        app_name=app_name,
+                                        android_package_name=android_package_for_unit if android_package_for_unit else None
+                                    )
                                 
                                 # For Pangle, create payload even if slot_name is empty (slot_name is not required)
                                 if slot_name or network_key == "pangle":
@@ -1320,7 +1343,7 @@ def render_new_create_app_ui():
                                                 "rewardAmount": 1
                                             }
                                     elif network_key == "pangle":
-                                        # Pangle: site_id, bidding_type, ad_slot_type
+                                        # Pangle: app_id, bidding_type, ad_slot_type, ad_slot_name
                                         ad_slot_type_map = {
                                             "rv": 5,  # Rewarded Video
                                             "is": 6,  # Interstitial
@@ -1328,9 +1351,10 @@ def render_new_create_app_ui():
                                         }
                                         ad_slot_type = ad_slot_type_map.get(slot_type.lower(), 5)
                                         unit_payload = {
-                                            "site_id": "{APP_CODE}",  # Placeholder
+                                            "app_id": "{APP_CODE}",  # Placeholder
                                             "bidding_type": 1,  # Default: Bidding
                                             "ad_slot_type": ad_slot_type,
+                                            "ad_slot_name": slot_name if slot_name else "",  # Ad slot name
                                         }
                                         # Add type-specific fields
                                         if ad_slot_type == 5:  # Rewarded Video
@@ -1410,16 +1434,19 @@ def render_new_create_app_ui():
                                             "coppa": False,
                                         }
                                     elif network_key == "vungle":
-                                        # Vungle: name, adFormat (platform and package_name will be added separately)
-                                        ad_format_map = {
+                                        # Vungle: application, name, type, allowEndCards, isHBParticipation
+                                        type_map = {
                                             "rv": "Rewarded",
                                             "is": "Interstitial",
                                             "bn": "Banner"
                                         }
-                                        ad_format = ad_format_map.get(slot_type.lower(), "Rewarded")
+                                        unit_type = type_map.get(slot_type.lower(), "Rewarded")
                                         unit_payload = {
+                                            "application": "{APP_CODE}",  # Placeholder (vungleAppId)
                                             "name": slot_name,
-                                            "adFormat": ad_format,
+                                            "type": unit_type,
+                                            "allowEndCards": True,  # Default value
+                                            "isHBParticipation": True,  # Default value (In-app bidding)
                                         }
                                     else:
                                         # For other networks, try config.build_unit_payload if available
@@ -1439,7 +1466,7 @@ def render_new_create_app_ui():
                                                     elif network_key == "mintegral":
                                                         unit_payload_data["app_id"] = "{APP_CODE}"
                                                     elif network_key == "pangle":
-                                                        unit_payload_data["site_id"] = "{APP_CODE}"
+                                                        unit_payload_data["app_id"] = "{APP_CODE}"
                                                 
                                                 unit_payload = config.build_unit_payload(unit_payload_data)
                                             except Exception as e:
