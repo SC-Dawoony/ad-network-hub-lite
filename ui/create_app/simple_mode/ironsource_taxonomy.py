@@ -1,6 +1,6 @@
 """IronSource Taxonomy Selection Section"""
 import streamlit as st
-from network_configs.ironsource_config import IronSourceConfig
+from config.networks.ironsource_config import IronSourceConfig
 from components.one_click.category_matchers import match_ironsource_taxonomy
 
 

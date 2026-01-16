@@ -2,7 +2,7 @@
 from typing import Dict, List, Any, Optional
 import streamlit as st
 import re
-from network_configs.base_config import Field, ConditionalField, NetworkConfig
+from config.base_config import Field, ConditionalField, NetworkConfig
 
 
 class DynamicFormRenderer:

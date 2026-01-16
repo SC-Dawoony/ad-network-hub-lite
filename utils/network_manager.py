@@ -42,43 +42,43 @@ class MockNetworkManager:
         elif network == "pangle":
             # Use new PangleAPI
             if self._pangle_api is None:
-                from utils.network_apis.pangle_api import PangleAPI
+                from api.networks.pangle import PangleAPI
                 self._pangle_api = PangleAPI()
             return self._pangle_api.create_app(payload)
         elif network == "bigoads":
             # Use new BigOAdsAPI
             if self._bigoads_api is None:
-                from utils.network_apis.bigoads_api import BigOAdsAPI
+                from api.networks.bigoads import BigOAdsAPI
                 self._bigoads_api = BigOAdsAPI()
             return self._bigoads_api.create_app(payload)
         elif network == "mintegral":
             # Use new MintegralAPI
             if self._mintegral_api is None:
-                from utils.network_apis.mintegral_api import MintegralAPI
+                from api.networks.mintegral import MintegralAPI
                 self._mintegral_api = MintegralAPI()
             return self._mintegral_api.create_app(payload)
         elif network == "inmobi":
             # Use new InMobiAPI
             if self._inmobi_api is None:
-                from utils.network_apis.inmobi_api import InMobiAPI
+                from api.networks.inmobi import InMobiAPI
                 self._inmobi_api = InMobiAPI()
             return self._inmobi_api.create_app(payload)
         elif network == "fyber":
             # Use new FyberAPI
             if self._fyber_api is None:
-                from utils.network_apis.fyber_api import FyberAPI
+                from api.networks.fyber import FyberAPI
                 self._fyber_api = FyberAPI()
             return self._fyber_api.create_app(payload)
         elif network == "unity":
             # Use new UnityAPI
             if self._unity_api is None:
-                from utils.network_apis.unity_api import UnityAPI
+                from api.networks.unity import UnityAPI
                 self._unity_api = UnityAPI()
             return self._unity_api.create_app(payload)
         elif network == "vungle":
             # Use new VungleAPI
             if self._vungle_api is None:
-                from utils.network_apis.vungle_api import VungleAPI
+                from api.networks.vungle import VungleAPI
                 self._vungle_api = VungleAPI()
             return self._vungle_api.create_app(payload)
         
@@ -207,7 +207,7 @@ class MockNetworkManager:
         """
         # Use new IronSourceAuth
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.auth.get_headers()
     
@@ -271,7 +271,7 @@ class MockNetworkManager:
         """Create app via IronSource API (wrapper for compatibility)"""
         # Use new IronSourceAPI
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.create_app(payload)
     
@@ -286,56 +286,56 @@ class MockNetworkManager:
         if network == "ironsource":
             # Use new IronSourceAPI
             if self._ironsource_api is None:
-                from utils.network_apis.ironsource_api import IronSourceAPI
+                from api.networks.ironsource import IronSourceAPI
                 self._ironsource_api = IronSourceAPI()
             return self._ironsource_api.create_unit(payload, app_key=app_key)
         elif network == "bigoads":
             # Use new BigOAdsAPI
             if self._bigoads_api is None:
-                from utils.network_apis.bigoads_api import BigOAdsAPI
+                from api.networks.bigoads import BigOAdsAPI
                 self._bigoads_api = BigOAdsAPI()
             return self._bigoads_api.create_unit(payload, app_key=app_key)
         elif network == "pangle":
             # Use new PangleAPI
             if self._pangle_api is None:
-                from utils.network_apis.pangle_api import PangleAPI
+                from api.networks.pangle import PangleAPI
                 self._pangle_api = PangleAPI()
             return self._pangle_api.create_unit(payload, app_key=app_key)
         elif network == "mintegral":
             # Use new MintegralAPI
             if self._mintegral_api is None:
-                from utils.network_apis.mintegral_api import MintegralAPI
+                from api.networks.mintegral import MintegralAPI
                 self._mintegral_api = MintegralAPI()
             return self._mintegral_api.create_unit(payload, app_key=app_key)
         elif network == "inmobi":
             # Use new InMobiAPI
             if self._inmobi_api is None:
-                from utils.network_apis.inmobi_api import InMobiAPI
+                from api.networks.inmobi import InMobiAPI
                 self._inmobi_api = InMobiAPI()
             return self._inmobi_api.create_unit(payload, app_key=app_key)
         elif network == "fyber":
             # Use new FyberAPI
             if self._fyber_api is None:
-                from utils.network_apis.fyber_api import FyberAPI
+                from api.networks.fyber import FyberAPI
                 self._fyber_api = FyberAPI()
             return self._fyber_api.create_unit(payload, app_key=app_key)
         elif network == "applovin":
             # Use new AppLovinAPI
             if self._applovin_api is None:
-                from utils.network_apis.applovin_api import AppLovinAPI
+                from api.networks.applovin import AppLovinAPI
                 self._applovin_api = AppLovinAPI()
             return self._applovin_api.create_unit(payload, app_key=app_key)
         elif network == "unity":
             # Unity uses create_ad_units directly, but for consistency:
             # Use new UnityAPI
             if self._unity_api is None:
-                from utils.network_apis.unity_api import UnityAPI
+                from api.networks.unity import UnityAPI
                 self._unity_api = UnityAPI()
             return self._unity_api.create_unit(payload, app_key=app_key)
         elif network == "vungle":
             # Use new VungleAPI
             if self._vungle_api is None:
-                from utils.network_apis.vungle_api import VungleAPI
+                from api.networks.vungle import VungleAPI
                 self._vungle_api = VungleAPI()
             return self._vungle_api.create_unit(payload, app_key=app_key)
         
@@ -365,7 +365,7 @@ class MockNetworkManager:
         """
         # Use new IronSourceAPI
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.create_placements(app_key, ad_units)
     
@@ -384,7 +384,7 @@ class MockNetworkManager:
         """
         # Use new IronSourceAPI
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.update_ad_units(app_key, ad_units)
     
@@ -401,7 +401,7 @@ class MockNetworkManager:
         """
         # Use new IronSourceAPI
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.get_instances(app_key)
     
@@ -1028,7 +1028,7 @@ class MockNetworkManager:
             Access token string or None if failed
         """
         if self._fyber_api is None:
-            from utils.network_apis.fyber_api import FyberAPI
+            from api.networks.fyber import FyberAPI
             self._fyber_api = FyberAPI()
         return self._fyber_api.get_access_token()
     
@@ -1124,7 +1124,7 @@ class MockNetworkManager:
             API response dict
         """
         if self._unity_api is None:
-            from utils.network_apis.unity_api import UnityAPI
+            from api.networks.unity import UnityAPI
             self._unity_api = UnityAPI()
         return self._unity_api.create_ad_units(project_id, store_name, ad_units_payload)
     
@@ -1135,7 +1135,7 @@ class MockNetworkManager:
         New code should use UnityAPI.update_ad_units directly.
         """
         if self._unity_api is None:
-            from utils.network_apis.unity_api import UnityAPI
+            from api.networks.unity import UnityAPI
             self._unity_api = UnityAPI()
         return self._unity_api.update_ad_units(project_id, store_name, ad_units_payload)
 
@@ -1146,7 +1146,7 @@ class MockNetworkManager:
         New code should use UnityAPI.create_placements directly.
         """
         if self._unity_api is None:
-            from utils.network_apis.unity_api import UnityAPI
+            from api.networks.unity import UnityAPI
             self._unity_api = UnityAPI()
         return self._unity_api.create_placements(project_id, store_name, ad_unit_id, placements_payload)
     
@@ -1157,7 +1157,7 @@ class MockNetworkManager:
         New code should use UnityAPI.get_ad_units directly.
         """
         if self._unity_api is None:
-            from utils.network_apis.unity_api import UnityAPI
+            from api.networks.unity import UnityAPI
             self._unity_api = UnityAPI()
         return self._unity_api.get_ad_units(project_id)
 
@@ -1449,7 +1449,7 @@ class MockNetworkManager:
         """
         # Use new IronSourceAPI
         if self._ironsource_api is None:
-            from utils.network_apis.ironsource_api import IronSourceAPI
+            from api.networks.ironsource import IronSourceAPI
             self._ironsource_api = IronSourceAPI()
         return self._ironsource_api.get_apps(app_key=app_key)
     
@@ -2065,7 +2065,7 @@ class MockNetworkManager:
         New code should use UnityAPI.get_apps directly.
         """
         if self._unity_api is None:
-            from utils.network_apis.unity_api import UnityAPI
+            from api.networks.unity import UnityAPI
             self._unity_api = UnityAPI()
         return self._unity_api.get_apps(app_key=None)
     
@@ -2080,31 +2080,31 @@ class MockNetworkManager:
         if network == "bigoads":
             # Use new BigOAdsAPI
             if self._bigoads_api is None:
-                from utils.network_apis.bigoads_api import BigOAdsAPI
+                from api.networks.bigoads import BigOAdsAPI
                 self._bigoads_api = BigOAdsAPI()
             return self._bigoads_api.get_apps(app_key=app_key)
         elif network == "ironsource":
             # Use new IronSourceAPI
             if self._ironsource_api is None:
-                from utils.network_apis.ironsource_api import IronSourceAPI
+                from api.networks.ironsource import IronSourceAPI
                 self._ironsource_api = IronSourceAPI()
             return self._ironsource_api.get_apps(app_key=app_key)
         elif network == "mintegral":
             # Use new MintegralAPI
             if self._mintegral_api is None:
-                from utils.network_apis.mintegral_api import MintegralAPI
+                from api.networks.mintegral import MintegralAPI
                 self._mintegral_api = MintegralAPI()
             return self._mintegral_api.get_apps(app_key=app_key)
         elif network == "inmobi":
             # Use new InMobiAPI
             if self._inmobi_api is None:
-                from utils.network_apis.inmobi_api import InMobiAPI
+                from api.networks.inmobi import InMobiAPI
                 self._inmobi_api = InMobiAPI()
             return self._inmobi_api.get_apps(app_key=app_key)
         elif network == "fyber":
             # Use new FyberAPI
             if self._fyber_api is None:
-                from utils.network_apis.fyber_api import FyberAPI
+                from api.networks.fyber import FyberAPI
                 self._fyber_api = FyberAPI()
             return self._fyber_api.get_apps(app_key=app_key)
         elif network == "vungle":
@@ -2139,14 +2139,14 @@ class MockNetworkManager:
         elif network == "unity":
             # Use new UnityAPI
             if self._unity_api is None:
-                from utils.network_apis.unity_api import UnityAPI
+                from api.networks.unity import UnityAPI
                 self._unity_api = UnityAPI()
             # Unity does not use app_key, but we pass it for interface consistency
             return self._unity_api.get_apps(app_key=None)
         elif network == "pangle":
             # Use new PangleAPI
             if self._pangle_api is None:
-                from utils.network_apis.pangle_api import PangleAPI
+                from api.networks.pangle import PangleAPI
                 self._pangle_api = PangleAPI()
             return self._pangle_api.get_apps(app_key=app_key)
         
@@ -2171,7 +2171,7 @@ class MockNetworkManager:
         if network == "pangle":
             # Use new PangleAPI
             if self._pangle_api is None:
-                from utils.network_apis.pangle_api import PangleAPI
+                from api.networks.pangle import PangleAPI
                 self._pangle_api = PangleAPI()
             return self._pangle_api.get_units(app_code=app_code)
         

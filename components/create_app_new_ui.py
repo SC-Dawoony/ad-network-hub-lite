@@ -857,7 +857,7 @@ def render_new_create_app_ui():
                 st.session_state.ironsource_taxonomy = "other"
             
             # Get taxonomy options
-            from network_configs.ironsource_config import IronSourceConfig
+            from config.networks.ironsource_config import IronSourceConfig
             ironsource_config = IronSourceConfig()
             taxonomy_options = ironsource_config._get_taxonomies()
             
@@ -1117,7 +1117,7 @@ def render_new_create_app_ui():
                         required_fields = config.get_app_creation_fields()
                         for field in required_fields:
                             if field.required and field.name not in android_params:
-                                from network_configs.base_config import ConditionalField
+                                from config.base_config import ConditionalField
                                 if isinstance(field, ConditionalField):
                                     if field.should_show(android_params):
                                         missing_required_android.append(field.label or field.name)
@@ -1145,7 +1145,7 @@ def render_new_create_app_ui():
                         required_fields = config.get_app_creation_fields()
                         for field in required_fields:
                             if field.required and field.name not in ios_params:
-                                from network_configs.base_config import ConditionalField
+                                from config.base_config import ConditionalField
                                 if isinstance(field, ConditionalField):
                                     if field.should_show(ios_params):
                                         missing_required_ios.append(field.label or field.name)
@@ -1168,7 +1168,7 @@ def render_new_create_app_ui():
                     missing_required = []
                     for field in required_fields:
                         if field.required and field.name not in mapped_params:
-                            from network_configs.base_config import ConditionalField
+                            from config.base_config import ConditionalField
                             if isinstance(field, ConditionalField):
                                 if field.should_show(mapped_params):
                                     missing_required.append(field.label or field.name)
@@ -2920,7 +2920,7 @@ def render_new_create_app_ui():
                                                             try:
                                                                 # Use VungleAPI to get placement details first
                                                                 if network_manager._vungle_api is None:
-                                                                    from utils.network_apis.vungle_api import VungleAPI
+                                                                    from api.networks.vungle import VungleAPI
                                                                     network_manager._vungle_api = VungleAPI()
                                                                 
                                                                 # GET /placements/{id} to get full placement details
