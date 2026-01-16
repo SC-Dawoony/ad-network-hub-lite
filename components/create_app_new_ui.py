@@ -7,9 +7,15 @@ from utils.network_manager import get_network_manager
 from utils.ui_helpers import handle_api_response
 from utils.helpers import mask_sensitive_data
 from network_configs import get_network_config, get_network_display_names, NETWORK_REGISTRY
-from utils.app_store_helper import get_ios_app_details, get_android_app_details
 from services.app_creation import extract_app_info_from_response, map_store_info_to_network_params
 from services.unit_creation import create_ad_units_immediately
+from ui.create_app.simple_mode import (
+    render_store_url_input,
+    render_app_info_display,
+    render_identifier_selection,
+    render_ironsource_taxonomy_selection,
+    render_network_selection
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,405 +24,49 @@ def render_new_create_app_ui():
     """Render the new simplified Create App UI"""
     st.subheader("📱 Create App (New)")
     
-    # Step 1: Store URL Input
-    st.markdown("### 1️⃣ Store URL 입력")
-    col_android, col_ios = st.columns(2)
-    
-    with col_android:
-        android_url = st.text_input(
-            "🤖 Google Play Store URL",
-            placeholder="https://play.google.com/store/apps/details?id=...",
-            key="new_android_url",
-            help="Android 앱의 Google Play Store URL을 입력하세요"
-        )
-    
-    with col_ios:
-        ios_url = st.text_input(
-            "🍎 App Store URL",
-            placeholder="https://apps.apple.com/us/app/...",
-            key="new_ios_url",
-            help="iOS 앱의 App Store URL을 입력하세요"
-        )
-    
-    # Fetch button
-    fetch_info_button = st.button("🔍 앱 정보 조회", type="primary", use_container_width=True)
-    
     # Initialize session state
-    if "store_info_ios" not in st.session_state:
-        st.session_state.store_info_ios = None
-    if "store_info_android" not in st.session_state:
-        st.session_state.store_info_android = None
     if "selected_networks" not in st.session_state:
         st.session_state.selected_networks = []
     
-    # Fetch app store info
-    if fetch_info_button:
-        ios_info = None
-        android_info = None
-        
-        if ios_url:
-            with st.spinner("iOS 앱 정보를 가져오는 중..."):
-                try:
-                    ios_info = get_ios_app_details(ios_url)
-                    if ios_info:
-                        st.session_state.store_info_ios = ios_info
-                        st.success(f"✅ iOS 앱 정보 조회 성공: {ios_info.get('name', 'N/A')}")
-                    else:
-                        st.error("❌ iOS 앱 정보를 찾을 수 없습니다.")
-                except Exception as e:
-                    st.error(f"❌ iOS 앱 정보 조회 실패: {str(e)}")
-        
-        if android_url:
-            with st.spinner("Android 앱 정보를 가져오는 중..."):
-                try:
-                    android_info = get_android_app_details(android_url)
-                    if android_info:
-                        st.session_state.store_info_android = android_info
-                        st.success(f"✅ Android 앱 정보 조회 성공: {android_info.get('name', 'N/A')}")
-                    else:
-                        st.error("❌ Android 앱 정보를 찾을 수 없습니다.")
-                except Exception as e:
-                    st.error(f"❌ Android 앱 정보 조회 실패: {str(e)}")
-        
-        if not ios_url and not android_url:
-            st.warning("⚠️ 최소 하나의 Store URL을 입력해주세요.")
+    # Step 1: Store URL Input
+    render_store_url_input()
     
     # Display fetched info
-    if st.session_state.store_info_ios or st.session_state.store_info_android:
-        st.markdown("### 📋 조회된 앱 정보")
-        
-        info_cols = st.columns(2)
-        
-        with info_cols[0]:
-            if st.session_state.store_info_android:
-                info = st.session_state.store_info_android
-                st.markdown("**🤖 Android**")
-                st.write(f"**이름:** {info.get('name', 'N/A')}")
-                st.write(f"**Package Name:** {info.get('package_name', 'N/A')}")
-                st.write(f"**개발자:** {info.get('developer', 'N/A')}")
-                st.write(f"**카테고리:** {info.get('category', 'N/A')}")
-        
-        with info_cols[1]:
-            if st.session_state.store_info_ios:
-                info = st.session_state.store_info_ios
-                st.markdown("**🍎 iOS**")
-                st.write(f"**이름:** {info.get('name', 'N/A')}")
-                st.write(f"**Bundle ID:** {info.get('bundle_id', 'N/A')}")
-                st.write(f"**App ID:** {info.get('app_id', 'N/A')}")
-                st.write(f"**개발자:** {info.get('developer', 'N/A')}")
-                st.write(f"**카테고리:** {info.get('category', 'N/A')}")
-        
-        # Check if Android Package Name and iOS Bundle ID are different
-        android_package = None
-        ios_bundle_id = None
-        
-        if st.session_state.store_info_android:
-            android_package = st.session_state.store_info_android.get('package_name', '')
-        if st.session_state.store_info_ios:
-            ios_bundle_id = st.session_state.store_info_ios.get('bundle_id', '')
-        
-        # Layout: 좌우 배치 (Ad Unit 식별자 선택 | IronSource Taxonomy 선택)
+    render_app_info_display()
+    
+    # Check if Android Package Name and iOS Bundle ID are different
+    android_package = None
+    ios_bundle_id = None
+    
+    if st.session_state.get("store_info_android"):
+        android_package = st.session_state.store_info_android.get('package_name', '')
+    if st.session_state.get("store_info_ios"):
+        ios_bundle_id = st.session_state.store_info_ios.get('bundle_id', '')
+    
+    # Layout: 좌우 배치 (Ad Unit 식별자 선택 | IronSource Taxonomy 선택)
+    if android_package or ios_bundle_id:
         st.divider()
         left_col, right_col = st.columns(2)
         
         # Left column: Ad Unit 이름 생성용 식별자 선택
         with left_col:
-            # Show button to open dialog if both exist and are different
             if android_package and ios_bundle_id and android_package != ios_bundle_id:
                 st.markdown("### 🔀 App match name")
-                
-                # Initialize selection in session state if not exists
-                if "ios_ad_unit_identifier" not in st.session_state:
-                    # Default: use Android Package Name (last part), convert to lowercase
-                    android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
-                    st.session_state.ios_ad_unit_identifier = {
-                        "source": "android_package",
-                        "value": android_package_last.lower()
-                    }
-                
-                # Show current selection status
-                selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
-                if selected_value:
-                    st.info(f"**선택된 값:** `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
-                
-                # Define dialog function
-                @st.dialog("🔀 App match name 선택")
-                def identifier_selection_dialog():
-                    st.markdown("### 🔀 App match name")
-                    st.info("💡 Android Package Name과 iOS Bundle ID가 다릅니다. Ad Unit 이름 생성 시 어떤 값을 사용할지 선택하거나 직접 입력하세요.")
-                    
-                    # Extract last part of Android Package Name
-                    android_package_last = android_package.split('.')[-1] if '.' in android_package else android_package
-                    ios_bundle_id_last = ios_bundle_id.split('.')[-1] if '.' in ios_bundle_id else ios_bundle_id
-                    
-                    # Selection options (display original case, but store lowercase)
-                    selection_options = [
-                        f"Android Package Name: `{android_package_last}`",
-                        f"iOS Bundle ID: `{ios_bundle_id_last}`",
-                        "직접 입력"
-                    ]
-                    
-                    # Get current selection
-                    current_selection = st.session_state.ios_ad_unit_identifier.get("source", "android_package")
-                    if current_selection == "android_package":
-                        current_index = 0
-                    elif current_selection == "ios_bundle_id":
-                        current_index = 1
-                    else:
-                        current_index = 2
-                    
-                    selected_option = st.radio(
-                        "선택하세요:",
-                        options=selection_options,
-                        index=current_index,
-                        key="ios_ad_unit_identifier_radio_dialog"
-                    )
-                    
-                    # Update session state based on selection (convert to lowercase)
-                    if selected_option.startswith("Android Package Name"):
-                        st.session_state.ios_ad_unit_identifier = {
-                            "source": "android_package",
-                            "value": android_package_last.lower()
-                        }
-                    elif selected_option.startswith("iOS Bundle ID"):
-                        st.session_state.ios_ad_unit_identifier = {
-                            "source": "ios_bundle_id",
-                            "value": ios_bundle_id_last.lower()
-                        }
-                    else:  # 직접 입력
-                        custom_value = st.text_input(
-                            "직접 입력:",
-                            value=st.session_state.ios_ad_unit_identifier.get("value", ""),
-                            key="ios_ad_unit_identifier_custom_dialog",
-                            help="Ad Unit 이름 생성에 사용할 식별자를 직접 입력하세요 (소문자로 저장됩니다)"
-                        )
-                        if custom_value:
-                            st.session_state.ios_ad_unit_identifier = {
-                                "source": "custom",
-                                "value": custom_value.lower()
-                            }
-                    
-                    # Show preview
-                    selected_value = st.session_state.ios_ad_unit_identifier.get("value", "")
-                    if selected_value:
-                        st.success(f"✅ 선택된 값: `{selected_value}` (이 값이 Android와 iOS Ad Unit 이름 생성에 사용됩니다)")
-                    
-                    # Close dialog buttons
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("✅ 확인", key="confirm_identifier_dialog", use_container_width=True, type="primary"):
-                            st.rerun()
-                    with col2:
-                        if st.button("❌ 취소", key="cancel_identifier_dialog", use_container_width=True):
-                            st.rerun()
-                
-                # Button to open dialog
-                if st.button("🔀 App match name 선택", key="open_identifier_dialog", use_container_width=True):
-                    identifier_selection_dialog()
+                render_identifier_selection(android_package, ios_bundle_id)
             else:
                 st.markdown("### 🔀 App match name")
                 st.info("💡 Android Package Name과 iOS Bundle ID가 같거나 하나만 입력된 경우 이 기능을 사용할 수 없습니다.")
         
         # Right column: IronSource Taxonomy Selection
         with right_col:
-            st.markdown("### 📂 IronSource Taxonomy")
-            st.info("💡 IronSource 네트워크를 사용하는 경우, Taxonomy (Sub-genre)를 선택해주세요. 카테고리가 자동으로 매칭되지만 수동으로 변경할 수 있습니다.")
-            
-            # Initialize taxonomy in session state if not exists
-            if "ironsource_taxonomy" not in st.session_state:
-                st.session_state.ironsource_taxonomy = "other"
-            
-            # Get taxonomy options
-            from config.networks.ironsource_config import IronSourceConfig
-            ironsource_config = IronSourceConfig()
-            taxonomy_options = ironsource_config._get_taxonomies()
-            
-            # Build hierarchical taxonomy structure from images
-            taxonomy_structure = {
-                "Casual": {
-                    "Hyper Casual": ["stacking", "dexterity", "rising/falling", "swerve", "merge", "idle", ".io", "puzzle", "tap/Timing", "turning", "ball", "other"],
-                    "Puzzle": ["actionPuzzle", "match3", "bubbleShooter", "jigsaw", "crossword", "word", "trivia", "board", "coloring Games", "hidden Objects", "solitaire", "nonCasinoCardGame", "otherPuzzle"],
-                    "Arcade": ["platformer", "idler", "shootEmUp", "endlessRunner", "towerDefense", "otherArcade"],
-                    "Lifestyle": ["customization", "interactiveStory", "music/band", "otherLifestyle"],
-                    "Simulation": ["adventures", "breeding", "tycoon/crafting", "sandbox", "cooking/timeManagement", "farming", "idleSimulation", "otherSimulation"],
-                    "Kids & Family": ["kids&Family"],
-                    "Other Casual": ["otherCasual"]
-                },
-                "Mid-Core": {
-                    "Shooter": ["battleRoyale", "classicFPS", "snipers", "tacticalShooter", "otherShooter"],
-                    "RPG": ["actionRPG", "turnBasedRPG", "fighting", "MMORPG", "puzzleRPG", "survival", "idleRPG", "otherRPG"],
-                    "Card Games": ["cardBattler"],
-                    "Strategy": ["4xStrategy", "build&Battle", "MOBA", "syncBattler", "otherStrategy"],
-                    "Other Mid-Core": ["otherMidCore"]
-                },
-                "Sports & Racing": {
-                    "Sports": ["casualSports", "licensedSports"],
-                    "Racing": ["casualRacing", "simulationRacing", "otherRacing"],
-                    "Other Sports & Racing": ["otherSports&Racing"]
-                }
-            }
-            
-            # Create API value to display name mapping
-            api_to_display = {api_value: display_name for display_name, api_value in taxonomy_options}
-            
-            # Auto-match taxonomy from app category (if not already set)
-            # Priority: Android category first, then iOS category
-            if st.session_state.ironsource_taxonomy == "other":
-                android_category = None
-                ios_category = None
-                
-                if st.session_state.store_info_android:
-                    android_category = st.session_state.store_info_android.get("category", "")
-                if st.session_state.store_info_ios:
-                    ios_category = st.session_state.store_info_ios.get("category", "")
-                
-                # Try Android category first (priority)
-                app_category = android_category if android_category else ios_category
-                
-                if app_category:
-                    from components.one_click.category_matchers import match_ironsource_taxonomy
-                    # Pass Android category for better matching (if available)
-                    auto_matched_taxonomy = match_ironsource_taxonomy(
-                        app_category, 
-                        taxonomy_options,
-                        android_category=android_category if android_category else None
-                    )
-                    if auto_matched_taxonomy and auto_matched_taxonomy != "other":
-                        st.session_state.ironsource_taxonomy = auto_matched_taxonomy
-                        if auto_matched_taxonomy in api_to_display:
-                            category_source = "Android" if android_category else "iOS"
-                            st.success(f"💡 자동 매칭 ({category_source}): '{app_category}' → '{api_to_display[auto_matched_taxonomy]}'")
-            
-            # Build flat list of all taxonomy options with category/genre info for display
-            taxonomy_display_options = []
-            for category, genres in taxonomy_structure.items():
-                for genre, sub_genres in genres.items():
-                    for sub_genre in sub_genres:
-                        display_name = api_to_display.get(sub_genre, sub_genre)
-                        taxonomy_display_options.append((f"{category} > {genre} > {display_name}", sub_genre))
-            
-            # Create selectbox with hierarchical display
-            selected_index = 0
-            for idx, (display_name, api_value) in enumerate(taxonomy_display_options):
-                if api_value == st.session_state.ironsource_taxonomy:
-                    selected_index = idx
-                    break
-            
-            selected_taxonomy_display = st.selectbox(
-                "Taxonomy (Sub-genre)*",
-                options=[opt[0] for opt in taxonomy_display_options],
-                index=selected_index,
-                key="ironsource_taxonomy_select",
-                help="IronSource Taxonomy를 선택하세요. 계층 구조: Category > Genre > Sub-genre"
-            )
-            
-            # Extract API value from selected display
-            for display_name, api_value in taxonomy_display_options:
-                if display_name == selected_taxonomy_display:
-                    st.session_state.ironsource_taxonomy = api_value
-                    break
+            render_ironsource_taxonomy_selection()
         
         st.divider()
         
         # Step 2: Network Selection
-        st.markdown("### 2️⃣ 네트워크 선택")
-        st.markdown("앱을 생성할 네트워크를 선택하세요 (여러 개 선택 가능)")
+        selected_networks, available_networks = render_network_selection()
         
-        # Get available networks (include AppLovin even though it doesn't support create app)
-        available_networks = {}
-        display_names = get_network_display_names()
-        
-        # Collect all networks (including AppLovin for Ad Unit creation only)
-        all_networks = {}
-        for network_key, network_config in NETWORK_REGISTRY.items():
-            # Include AppLovin even if it doesn't support create app (for Ad Unit creation)
-            if network_config.supports_create_app() or network_key == "applovin":
-                all_networks[network_key] = display_names.get(network_key, network_key.title())
-        
-        # Sort networks: AppLovin, Unity, IronSource, then alphabetical, Pangle last
-        priority_networks = ["applovin", "unity", "ironsource"]
-        sorted_networks = []
-        
-        # Add priority networks first
-        for priority_key in priority_networks:
-            if priority_key in all_networks:
-                sorted_networks.append((priority_key, all_networks[priority_key]))
-        
-        # Add remaining networks in alphabetical order (excluding priority)
-        remaining_networks = []
-        for network_key, network_display in all_networks.items():
-            if network_key not in priority_networks:
-                remaining_networks.append((network_key, network_display))
-        
-        # Sort remaining networks alphabetically by display name
-        remaining_networks.sort(key=lambda x: x[1])
-        sorted_networks.extend(remaining_networks)
-        
-        # Convert to ordered dict
-        available_networks = dict(sorted_networks)
-        
-        # Select All / Deselect All buttons
-        button_cols = st.columns([1, 1, 4])
-        with button_cols[0]:
-            if st.button("✅ 모두 선택", key="select_all_networks", use_container_width=True):
-                # Select all networks
-                enabled_networks = list(available_networks.keys())
-                st.session_state.selected_networks = enabled_networks
-                # Update individual checkbox states
-                for network_key in enabled_networks:
-                    st.session_state[f"network_checkbox_{network_key}"] = True
-                st.rerun()
-        
-        with button_cols[1]:
-            if st.button("❌ 선택 해제", key="deselect_all_networks", use_container_width=True):
-                st.session_state.selected_networks = []
-                # Update individual checkbox states
-                for network_key in available_networks.keys():
-                    st.session_state[f"network_checkbox_{network_key}"] = False
-                st.rerun()
-        
-        # Network selection with checkboxes
-        selected_networks = []
-        network_cols = st.columns(3)
-        
-        for idx, (network_key, network_display) in enumerate(available_networks.items()):
-            with network_cols[idx % 3]:
-                # No disabled networks
-                is_disabled = False
-                display_label = network_display
-                help_text = None
-                
-                # Initialize checkbox state if not exists
-                checkbox_key = f"network_checkbox_{network_key}"
-                if checkbox_key not in st.session_state:
-                    st.session_state[checkbox_key] = network_key in st.session_state.selected_networks
-                
-                # Get checkbox value from session state
-                checkbox_value = st.session_state[checkbox_key]
-                
-                # Create checkbox (will update session state automatically)
-                is_checked = st.checkbox(
-                    display_label,
-                    key=checkbox_key,
-                    value=checkbox_value,
-                    help=help_text
-                )
-
-                # Update selected_networks list based on checkbox state
-                if is_checked:
-                    if network_key not in selected_networks:
-                        selected_networks.append(network_key)
-                elif network_key in selected_networks:
-                        # If unchecked, remove from selected_networks
-                            selected_networks.remove(network_key)
-        
-        st.session_state.selected_networks = selected_networks
-        
-        if not selected_networks:
-            st.info("💡 네트워크를 선택해주세요.")
-        else:
-            st.success(f"✅ {len(selected_networks)}개 네트워크 선택됨: {', '.join([available_networks[n] for n in selected_networks])}")
-            
+        if selected_networks:
             st.divider()
             
             # Step 3: Preview Payloads (before creating)
