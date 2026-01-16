@@ -2100,8 +2100,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     
                                     logger.info(f"[Mintegral iOS] Standard matching failed, trying Android app first strategy")
                                     logger.info(f"[Mintegral iOS] package_name: {package_name}, app_name (normalized): {app_name_from_unit}")
-                                    st.write(f"🔍 [Mintegral iOS] Standard matching failed, trying Android app first strategy")
-                                    st.write(f"🔍 [Mintegral iOS] package_name: {package_name}, app_name (normalized): {app_name_from_unit}")
                                     
                                     # Strategy: Find Android app by package_name, then find iOS app with same name
                                     # Mintegral iOS apps use iTunes ID format (id{number}) in package field, not actual package_name
@@ -2109,14 +2107,12 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     if package_name:
                                         # First, try to find Android app by package_name
                                         logger.info(f"[Mintegral iOS] Step 1: Finding Android app by package_name: '{package_name}'")
-                                        st.write(f"🔍 [Mintegral iOS] Step 1: Finding Android app by package_name: '{package_name}'")
                                         android_app = find_app_by_package_name(actual_network, package_name, "android")
                                         if android_app:
                                             android_app_name = android_app.get("name") or android_app.get("appName") or android_app.get("app_name", "")
                                             android_app_id = android_app.get("app_id") or android_app.get("id", "")
                                             logger.info(f"[Mintegral iOS] Found Android app by package_name: '{package_name}'")
                                             logger.info(f"[Mintegral iOS] Android app name: '{android_app_name}', app_id: {android_app_id}")
-                                            st.write(f"✅ [Mintegral iOS] Found Android app: '{android_app_name}' (app_id: {android_app_id})")
                                             
                                             # Strategy: Check app_id ±1 for iOS app with matching app_name
                                             # Mintegral often assigns consecutive app_ids to Android and iOS versions of the same app
@@ -2132,7 +2128,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                         # Check app_id - 1, app_id, app_id + 1
                                                         candidate_ids = [android_app_id_int - 1, android_app_id_int, android_app_id_int + 1]
                                                         logger.info(f"[Mintegral iOS] Step 2: Checking app_ids {candidate_ids} for iOS app with matching name")
-                                                        st.write(f"🔍 [Mintegral iOS] Step 2: Checking app_ids {candidate_ids} for iOS app with matching name: '{android_app_name}'")
                                                         
                                                         for candidate_id in candidate_ids:
                                                             if candidate_id == android_app_id_int:
@@ -2163,9 +2158,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                                                 logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_id ±1 strategy")
                                                                                 logger.info(f"[Mintegral iOS] Android app_id: {android_app_id_int}, iOS app_id: {ios_app_id}")
                                                                                 logger.info(f"[Mintegral iOS] iOS app name: '{app_name_in_list}', package: {ios_app_package}")
-                                                                                st.write(f"✅ [Mintegral iOS] Found iOS app by app_id ±1 strategy")
-                                                                                st.write(f"✅ [Mintegral iOS] Android app_id: {android_app_id_int}, iOS app_id: {ios_app_id}")
-                                                                                st.write(f"✅ [Mintegral iOS] iOS app name: '{app_name_in_list}', package: {ios_app_package}")
                                                                                 break
                                                             
                                                             if matched_app:
@@ -2173,27 +2165,21 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                         
                                                         if not matched_app:
                                                             logger.warning(f"[Mintegral iOS] ⚠️ No iOS app found with app_id ±1 strategy")
-                                                            st.write(f"⚠️ [Mintegral iOS] No iOS app found with app_id ±1 strategy")
                                                 except (ValueError, TypeError) as e:
                                                     logger.warning(f"[Mintegral iOS] ⚠️ Could not convert app_id to int: {android_app_id}, error: {str(e)}")
-                                                    st.write(f"⚠️ [Mintegral iOS] Could not convert app_id to int: {android_app_id}")
                                             else:
                                                 logger.warning(f"[Mintegral iOS] ⚠️ Android app_id is empty")
-                                                st.write(f"⚠️ [Mintegral iOS] Android app_id is empty")
                                         else:
                                             logger.warning(f"[Mintegral iOS] ⚠️ Android app not found by package_name: '{package_name}'")
-                                            st.write(f"⚠️ [Mintegral iOS] Android app not found by package_name: '{package_name}'")
                                             
                                             # Fallback: Try to find iOS app by app_name first, then find Android app by app_id ±1
                                             if app_name_from_unit:
                                                 logger.info(f"[Mintegral iOS] Fallback: Finding iOS app by app_name: '{app_name_from_unit}'")
-                                                st.write(f"🔍 [Mintegral iOS] Fallback: Finding iOS app by app_name: '{app_name_from_unit}'")
                                                 ios_app = find_app_by_name(actual_network, app_name_from_unit, "ios")
                                                 if ios_app:
                                                     ios_app_id = ios_app.get("app_id") or ios_app.get("id", "")
                                                     ios_app_package = ios_app.get("package", "") or ios_app.get("pkgName", "")
                                                     logger.info(f"[Mintegral iOS] ✅ Found iOS app by app_name: '{app_name_from_unit}' (app_id: {ios_app_id}, package: {ios_app_package})")
-                                                    st.write(f"✅ [Mintegral iOS] Found iOS app by app_name: '{app_name_from_unit}' (app_id: {ios_app_id}, package: {ios_app_package})")
                                                     
                                                     # Now try to find Android app by app_id ±1 from iOS app_id
                                                     if ios_app_id:
@@ -2207,7 +2193,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                                 # Check app_id - 1, app_id, app_id + 1
                                                                 candidate_ids = [ios_app_id_int - 1, ios_app_id_int, ios_app_id_int + 1]
                                                                 logger.info(f"[Mintegral iOS] Checking app_ids {candidate_ids} for Android app with matching name")
-                                                                st.write(f"🔍 [Mintegral iOS] Checking app_ids {candidate_ids} for Android app with matching name: '{app_name_from_unit}'")
                                                                 
                                                                 for candidate_id in candidate_ids:
                                                                     if candidate_id == ios_app_id_int:
@@ -2236,34 +2221,26 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                                                                         logger.info(f"[Mintegral iOS] ✅ Found Android app by app_id ±1 from iOS app_id")
                                                                                         logger.info(f"[Mintegral iOS] iOS app_id: {ios_app_id_int}, Android app_id: {android_app_id}")
                                                                                         logger.info(f"[Mintegral iOS] Android app name: '{app_name_in_list}'")
-                                                                                        st.write(f"✅ [Mintegral iOS] Found Android app by app_id ±1 from iOS app_id")
-                                                                                        st.write(f"✅ [Mintegral iOS] iOS app_id: {ios_app_id_int}, Android app_id: {android_app_id}")
-                                                                                        st.write(f"✅ [Mintegral iOS] Android app name: '{app_name_in_list}'")
                                                                                         break
                                                                     
                                                                     if matched_app:
                                                                         break
                                                         except (ValueError, TypeError) as e:
                                                             logger.warning(f"[Mintegral iOS] ⚠️ Could not convert iOS app_id to int: {ios_app_id}, error: {str(e)}")
-                                                            st.write(f"⚠️ [Mintegral iOS] Could not convert iOS app_id to int: {ios_app_id}")
                                                     
                                                     matched_app = ios_app
                                     elif app_name_from_unit:
                                         # Fallback: Try direct app_name matching with iOS platform
                                         logger.info(f"[Mintegral iOS] Fallback: Trying direct app_name matching: '{app_name_from_unit}'")
-                                        st.write(f"🔍 [Mintegral iOS] Fallback: Trying direct app_name matching: '{app_name_from_unit}'")
                                         ios_app = find_app_by_name(actual_network, app_name_from_unit, "ios")
                                         if ios_app:
                                             ios_app_id = ios_app.get("app_id") or ios_app.get("id", "")
                                             matched_app = ios_app
                                             logger.info(f"[Mintegral iOS] ✅ Found iOS app by direct app_name: '{app_name_from_unit}' (app_id: {ios_app_id})")
-                                            st.write(f"✅ [Mintegral iOS] Found iOS app by direct app_name: '{app_name_from_unit}' (app_id: {ios_app_id})")
                                         else:
                                             logger.warning(f"[Mintegral iOS] ⚠️ iOS app not found by direct app_name: '{app_name_from_unit}'")
-                                            st.write(f"⚠️ [Mintegral iOS] iOS app not found by direct app_name: '{app_name_from_unit}'")
                                     else:
                                         logger.warning(f"[Mintegral iOS] ⚠️ No package_name or app_name available for matching")
-                                        st.write(f"⚠️ [Mintegral iOS] No package_name or app_name available for matching")
                                 
                                 if matched_app:
                                     # Extract app identifiers
@@ -2282,13 +2259,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                         logger.info(f"[Mintegral] Matched app platform: {matched_app.get('platform', 'N/A')}")
                                         logger.info(f"[Mintegral] Extracted app_ids: {app_ids}")
                                         logger.info(f"[Mintegral] Extracted app_id: {app_id}, app_key: {app_key}, app_code: {app_ids.get('app_code')}")
-                                        st.write(f"🔍 [Mintegral Debug] Platform: {applovin_unit.get('platform')}")
-                                        st.write(f"🔍 [Mintegral Debug] Ad Format: {applovin_unit.get('ad_format')}")
-                                        st.write(f"🔍 [Mintegral Debug] Matched app: {matched_app.get('name', 'N/A')}")
-                                        st.write(f"🔍 [Mintegral Debug] Matched app keys: {list(matched_app.keys())}")
-                                        st.write(f"🔍 [Mintegral Debug] Matched app app_id: {matched_app.get('app_id', 'N/A')}, id: {matched_app.get('id', 'N/A')}")
-                                        st.write(f"🔍 [Mintegral Debug] Extracted app_ids: {app_ids}")
-                                        st.write(f"🔍 [Mintegral Debug] Extracted app_id: {app_id}, app_key: {app_key}")
                                     
                                     # For BigOAds, ensure app_key is set (fallback to app_id if app_code is missing)
                                     # Also handle case where app_code is "N/A" or empty string
@@ -2344,12 +2314,6 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                         logger.info(f"[BigOAds] Matched app platform: {matched_app.get('platform', 'N/A')}")
                                         logger.info(f"[BigOAds] Extracted app_ids: {app_ids}")
                                         logger.info(f"[BigOAds] Extracted app_code: {app_ids.get('app_code')}, app_key: {app_key}, app_id: {app_id}")
-                                        st.write(f"🔍 [BigOAds Debug] Ad Format: {applovin_unit.get('ad_format')}")
-                                        st.write(f"🔍 [BigOAds Debug] Platform: {applovin_unit.get('platform')}")
-                                        st.write(f"🔍 [BigOAds Debug] App found: {matched_app.get('name', 'N/A')}")
-                                        st.write(f"🔍 [BigOAds Debug] appCode from matched_app: {matched_app.get('appCode', 'N/A')}")
-                                        st.write(f"🔍 [BigOAds Debug] app_ids: {app_ids}")
-                                        st.write(f"🔍 [BigOAds Debug] app_key: {app_key}, app_id: {app_id}")
                                     
                                     # Get units for this app (sequential: app -> units)
                                     # For Pangle, query all ad units and filter by app_id on client side
@@ -2357,45 +2321,39 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     if actual_network == "pangle":
                                         # Pangle: Pass app_id for client-side filtering (API will query all ad units)
                                         unit_lookup_id = app_id or ""
-                                        st.write(f"🔍 [Pangle Debug] Before get_network_units: app_id={app_id} (will filter on client side)")
+                                        logger.info(f"[Pangle] Before get_network_units: app_id={app_id} (will filter on client side)")
                                     else:
                                         unit_lookup_id = app_key or app_id or ""
                                     
                                     # Debug logging for Mintegral before get_network_units
                                     if actual_network == "mintegral":
                                         logger.info(f"[Mintegral] Before get_network_units: unit_lookup_id={unit_lookup_id}, app_id={app_id}, app_key={app_key}")
-                                        st.write(f"🔍 [Mintegral Debug] Before get_network_units: unit_lookup_id={unit_lookup_id}")
                                     
                                     units = get_network_units(actual_network, unit_lookup_id)
                                     
                                     # Debug logging for Mintegral units
                                     if actual_network == "mintegral":
                                         logger.info(f"[Mintegral] Units count: {len(units) if units else 0}")
-                                        st.write(f"🔍 [Mintegral Debug] Units count: {len(units) if units else 0}")
                                         if units:
                                             logger.info(f"[Mintegral] First unit keys: {list(units[0].keys())}")
-                                            st.write(f"🔍 [Mintegral Debug] First unit keys: {list(units[0].keys())}")
-                                            st.write(f"🔍 [Mintegral Debug] First unit: {units[0]}")
                                         else:
                                             logger.warning(f"[Mintegral] No units returned from API!")
-                                            st.write(f"⚠️ [Mintegral Debug] No units returned from API!")
-                                            st.write(f"⚠️ [Mintegral Debug] unit_lookup_id used: {unit_lookup_id}")
+                                            logger.warning(f"[Mintegral] unit_lookup_id used: {unit_lookup_id}")
                                     
                                     # Debug logging for BigOAds units
                                     if actual_network == "bigoads":
-                                        st.write(f"🔍 [BigOAds Debug] Units count: {len(units) if units else 0}")
+                                        logger.info(f"[BigOAds] Units count: {len(units) if units else 0}")
                                         if units:
-                                            st.write(f"🔍 [BigOAds Debug] First unit: {units[0]}")
+                                            logger.info(f"[BigOAds] First unit: {units[0]}")
                                     
                                     # Debug logging for Pangle units
                                     if actual_network == "pangle":
-                                        st.write(f"🔍 [Pangle Debug] Units count: {len(units) if units else 0}")
+                                        logger.info(f"[Pangle] Units count: {len(units) if units else 0}")
                                         if units:
-                                            st.write(f"🔍 [Pangle Debug] First unit keys: {list(units[0].keys()) if units else []}")
-                                            st.write(f"🔍 [Pangle Debug] First unit: {units[0]}")
+                                            logger.info(f"[Pangle] First unit keys: {list(units[0].keys()) if units else []}")
                                         else:
-                                            st.write(f"⚠️ [Pangle Debug] No units returned from API!")
-                                            st.write(f"⚠️ [Pangle Debug] app_id used for API call: {app_id}")
+                                            logger.warning(f"[Pangle] No units returned from API!")
+                                            logger.warning(f"[Pangle] app_id used for API call: {app_id}")
                                     
                                     # Find matching unit by ad_format
                                     matched_unit = None
@@ -2416,82 +2374,72 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                             if units:
                                                 logger.info(f"[Mintegral] All units ad_type: {[u.get('ad_type') for u in units]}")
                                                 logger.info(f"[Mintegral] All units placement_name: {[u.get('placement_name') for u in units]}")
-                                            st.write(f"🔍 [Mintegral Debug] ========== Unit Matching ==========")
-                                            st.write(f"🔍 [Mintegral Debug] Ad format: {applovin_unit['ad_format']}")
-                                            st.write(f"🔍 [Mintegral Debug] Platform: {applovin_unit['platform']}")
-                                            st.write(f"🔍 [Mintegral Debug] Total units available: {len(units)}")
-                                            if units:
-                                                st.write(f"🔍 [Mintegral Debug] All units ad_type: {[u.get('ad_type') for u in units]}")
-                                                st.write(f"🔍 [Mintegral Debug] All units placement_name: {[u.get('placement_name') for u in units]}")
                                             if matched_unit:
                                                 logger.info(f"[Mintegral] Matched unit placement_name: {matched_unit.get('placement_name', 'N/A')}")
                                                 logger.info(f"[Mintegral] Matched unit placement_id: {matched_unit.get('placement_id', 'N/A')}, id: {matched_unit.get('id', 'N/A')}")
-                                                st.write(f"🔍 [Mintegral Debug] Matched unit placement_name: {matched_unit.get('placement_name', 'N/A')}")
-                                                st.write(f"🔍 [Mintegral Debug] Matched unit placement_id: {matched_unit.get('placement_id', 'N/A')}, id: {matched_unit.get('id', 'N/A')}")
-                                                st.write(f"🔍 [Mintegral Debug] Matched unit all keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[Mintegral] Matched unit all keys: {list(matched_unit.keys())}")
                                             else:
                                                 logger.warning(f"[Mintegral] No unit matched!")
-                                                st.write(f"⚠️ [Mintegral Debug] No unit matched!")
                                         
                                         # Debug logging for Vungle
                                         if actual_network == "vungle":
                                             if matched_unit:
-                                                st.write(f"🔍 [Vungle Debug] Matched unit: {matched_unit.get('name', 'N/A')}")
-                                                st.write(f"🔍 [Vungle Debug] referenceID: {matched_unit.get('referenceID', 'N/A')}")
-                                                st.write(f"🔍 [Vungle Debug] All keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[Vungle] Matched unit: {matched_unit.get('name', 'N/A')}")
+                                                logger.info(f"[Vungle] referenceID: {matched_unit.get('referenceID', 'N/A')}")
+                                                logger.info(f"[Vungle] All keys: {list(matched_unit.keys())}")
                                             else:
-                                                st.write(f"⚠️ [Vungle Debug] No unit matched!")
+                                                logger.warning(f"[Vungle] No unit matched!")
                                                 if units:
-                                                    st.write(f"🔍 [Vungle Debug] Available units: {len(units)}")
-                                                    st.write(f"🔍 [Vungle Debug] First unit keys: {list(units[0].keys()) if units else []}")
+                                                    logger.info(f"[Vungle] Available units: {len(units)}")
+                                                    logger.info(f"[Vungle] First unit keys: {list(units[0].keys()) if units else []}")
                                         
                                         # Debug logging for BigOAds unit matching
                                         if actual_network == "bigoads":
-                                            st.write(f"🔍 [BigOAds Debug] ========== Unit Matching ==========")
-                                            st.write(f"🔍 [BigOAds Debug] Ad format: {applovin_unit['ad_format']}")
-                                            st.write(f"🔍 [BigOAds Debug] Platform: {applovin_unit['platform']}")
-                                            st.write(f"🔍 [BigOAds Debug] Total units available: {len(units)}")
+                                            logger.info(f"[BigOAds] ========== Unit Matching ==========")
+                                            logger.info(f"[BigOAds] Ad format: {applovin_unit['ad_format']}")
+                                            logger.info(f"[BigOAds] Platform: {applovin_unit['platform']}")
+                                            logger.info(f"[BigOAds] Total units available: {len(units)}")
                                             if units:
-                                                st.write(f"🔍 [BigOAds Debug] All units adType: {[u.get('adType') for u in units]}")
-                                                st.write(f"🔍 [BigOAds Debug] All units name: {[u.get('name') for u in units]}")
-                                            st.write(f"🔍 [BigOAds Debug] Matched unit: {matched_unit}")
+                                                logger.info(f"[BigOAds] All units adType: {[u.get('adType') for u in units]}")
+                                                logger.info(f"[BigOAds] All units name: {[u.get('name') for u in units]}")
+                                            logger.info(f"[BigOAds] Matched unit: {matched_unit}")
                                             if matched_unit:
-                                                st.write(f"🔍 [BigOAds Debug] Matched unit name: {matched_unit.get('name', 'N/A')}")
-                                                st.write(f"🔍 [BigOAds Debug] Matched unit slotCode: {matched_unit.get('slotCode', 'N/A')}")
-                                                st.write(f"🔍 [BigOAds Debug] Matched unit adType: {matched_unit.get('adType', 'N/A')}")
+                                                logger.info(f"[BigOAds] Matched unit name: {matched_unit.get('name', 'N/A')}")
+                                                logger.info(f"[BigOAds] Matched unit slotCode: {matched_unit.get('slotCode', 'N/A')}")
+                                                logger.info(f"[BigOAds] Matched unit adType: {matched_unit.get('adType', 'N/A')}")
                                             else:
-                                                st.write(f"⚠️ [BigOAds Debug] No unit matched!")
-                                                st.write(f"⚠️ [BigOAds Debug] This means ad_network_app_id should still be set from app_key: {app_key}")
+                                                logger.warning(f"[BigOAds] No unit matched!")
+                                                logger.warning(f"[BigOAds] This means ad_network_app_id should still be set from app_key: {app_key}")
                                         
                                         # Debug logging for Pangle unit matching
                                         if actual_network == "pangle":
-                                            st.write(f"🔍 [Pangle Debug] ========== Unit Matching ==========")
-                                            st.write(f"🔍 [Pangle Debug] Ad format: {applovin_unit['ad_format']}")
-                                            st.write(f"🔍 [Pangle Debug] Platform: {applovin_unit['platform']}")
-                                            st.write(f"🔍 [Pangle Debug] Total units available: {len(units)}")
+                                            logger.info(f"[Pangle] ========== Unit Matching ==========")
+                                            logger.info(f"[Pangle] Ad format: {applovin_unit['ad_format']}")
+                                            logger.info(f"[Pangle] Platform: {applovin_unit['platform']}")
+                                            logger.info(f"[Pangle] Total units available: {len(units)}")
                                             if units:
-                                                st.write(f"🔍 [Pangle Debug] All units ad_slot_type: {[u.get('ad_slot_type') for u in units]}")
-                                                st.write(f"🔍 [Pangle Debug] All units ad_slot_name: {[u.get('ad_slot_name') for u in units]}")
-                                                st.write(f"🔍 [Pangle Debug] All units ad_slot_id: {[u.get('ad_slot_id') for u in units]}")
-                                            st.write(f"🔍 [Pangle Debug] Matched unit: {matched_unit}")
+                                                logger.info(f"[Pangle] All units ad_slot_type: {[u.get('ad_slot_type') for u in units]}")
+                                                logger.info(f"[Pangle] All units ad_slot_name: {[u.get('ad_slot_name') for u in units]}")
+                                                logger.info(f"[Pangle] All units ad_slot_id: {[u.get('ad_slot_id') for u in units]}")
+                                            logger.info(f"[Pangle] Matched unit: {matched_unit}")
                                             if matched_unit:
-                                                st.write(f"🔍 [Pangle Debug] Matched unit ad_slot_name: {matched_unit.get('ad_slot_name', 'N/A')}")
-                                                st.write(f"🔍 [Pangle Debug] Matched unit ad_slot_id: {matched_unit.get('ad_slot_id', 'N/A')}")
-                                                st.write(f"🔍 [Pangle Debug] Matched unit ad_slot_type: {matched_unit.get('ad_slot_type', 'N/A')}")
-                                                st.write(f"🔍 [Pangle Debug] Matched unit all keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[Pangle] Matched unit ad_slot_name: {matched_unit.get('ad_slot_name', 'N/A')}")
+                                                logger.info(f"[Pangle] Matched unit ad_slot_id: {matched_unit.get('ad_slot_id', 'N/A')}")
+                                                logger.info(f"[Pangle] Matched unit ad_slot_type: {matched_unit.get('ad_slot_type', 'N/A')}")
+                                                logger.info(f"[Pangle] Matched unit all keys: {list(matched_unit.keys())}")
                                             else:
-                                                st.write(f"⚠️ [Pangle Debug] No unit matched!")
-                                                st.write(f"⚠️ [Pangle Debug] This means ad_network_app_id should still be set from app_id: {app_id}")
+                                                logger.warning(f"[Pangle] No unit matched!")
+                                                logger.warning(f"[Pangle] This means ad_network_app_id should still be set from app_id: {app_id}")
                                     else:
                                         # No units found
                                         if actual_network == "bigoads":
-                                            st.write(f"⚠️ [BigOAds Debug] No units returned from API!")
-                                            st.write(f"⚠️ [BigOAds Debug] app_key used for API call: {app_key}")
-                                            st.write(f"⚠️ [BigOAds Debug] This means ad_network_app_id should still be set from app_key: {app_key}")
+                                            logger.warning(f"[BigOAds] No units returned from API!")
+                                            logger.warning(f"[BigOAds] app_key used for API call: {app_key}")
+                                            logger.warning(f"[BigOAds] This means ad_network_app_id should still be set from app_key: {app_key}")
                                         elif actual_network == "pangle":
-                                            st.write(f"⚠️ [Pangle Debug] No units returned from API!")
-                                            st.write(f"⚠️ [Pangle Debug] app_id used for API call: {app_id}")
-                                            st.write(f"⚠️ [Pangle Debug] This means ad_network_app_id should still be set from app_id: {app_id}")
+                                            logger.warning(f"[Pangle] No units returned from API!")
+                                            logger.warning(f"[Pangle] app_id used for API call: {app_id}")
+                                            logger.warning(f"[Pangle] This means ad_network_app_id should still be set from app_id: {app_id}")
                                     
                                     # Extract unit ID
                                     unit_id = ""
