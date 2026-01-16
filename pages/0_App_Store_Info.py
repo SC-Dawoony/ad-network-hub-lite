@@ -154,7 +154,7 @@ org.telegram.messenger
         st.markdown("<br>", unsafe_allow_html=True)
         
         # 조회 버튼
-        fetch_button = st.button("🔍 조회", type="primary", use_container_width=True, key="fetch_button")
+        fetch_button = st.button("🔍 조회", type="primary", width='stretch', key="fetch_button")
         
         # 조회 버튼 클릭 시 처리
         if fetch_button:

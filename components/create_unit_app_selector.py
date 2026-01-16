@@ -51,7 +51,7 @@ def render_app_code_selector(current_network: str, network_manager):
         with col1:
             st.info("💡 **Tip:** Create App에서 생성한 앱이 기본값으로 표시됩니다. API에서 최근 앱을 조회하려면 버튼을 클릭하세요.")
         with col2:
-            if st.button("🔍 최근 생성한 App 조회", use_container_width=True, key=f"{current_network}_fetch_apps_btn"):
+            if st.button("🔍 최근 생성한 App 조회", width='stretch', key=f"{current_network}_fetch_apps_btn"):
                 st.session_state[fetch_apps_key] = True
         
         # Fetch apps from API if button was clicked

@@ -80,18 +80,18 @@ def render_create_app_ui(current_network: str, network_display: str, config):
             # 3 columns for Mintegral
             col1, col2, col3 = st.columns(3)
             with col1:
-                reset_button = st.form_submit_button("🔄 Reset", use_container_width=True)
+                reset_button = st.form_submit_button("🔄 Reset", width='stretch')
             with col2:
-                submit_button = st.form_submit_button("✅ Create App", use_container_width=True)
+                submit_button = st.form_submit_button("✅ Create App", width='stretch')
             with col3:
-                test_api_button = st.form_submit_button("🔍 Test Media List API", use_container_width=True, help="Test Mintegral Media List API to check permissions")
+                test_api_button = st.form_submit_button("🔍 Test Media List API", width='stretch', help="Test Mintegral Media List API to check permissions")
         else:
             # 2 columns for other networks
             col1, col2 = st.columns(2)
             with col1:
-                reset_button = st.form_submit_button("🔄 Reset", use_container_width=True)
+                reset_button = st.form_submit_button("🔄 Reset", width='stretch')
             with col2:
-                submit_button = st.form_submit_button("✅ Create App", use_container_width=True)
+                submit_button = st.form_submit_button("✅ Create App", width='stretch')
             test_api_button = False
     
     # Handle form submission (outside form block)

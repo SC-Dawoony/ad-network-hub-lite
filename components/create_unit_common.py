@@ -123,7 +123,7 @@ def render_create_unit_common_ui(
             # Clear results after displaying (optional - remove if you want to keep them)
             # st.session_state[batch_results_key] = None
         
-        if st.button("✨ Create All 3 Slots (RV + IS + BN)", use_container_width=True, type="primary"):
+        if st.button("✨ Create All 3 Slots (RV + IS + BN)", width='stretch', type="primary"):
             # Validate app_info_to_use before creating slots
             if not app_info_to_use:
                 st.error("❌ App information is required. Please select an app first.")
@@ -398,7 +398,7 @@ def render_create_unit_common_ui(
             # App list API 조회 버튼과 Select App을 한 줄에 배치
             col1, col2 = st.columns([1, 2])
             with col1:
-                if st.button("🔍 GET App List (API 조회)", use_container_width=True, key="ironsource_fetch_app_list_for_create_unit"):
+                if st.button("🔍 GET App List (API 조회)", width='stretch', key="ironsource_fetch_app_list_for_create_unit"):
                     with st.spinner("Loading apps from API..."):
                         try:
                             api_apps = network_manager.get_apps(current_network)
@@ -540,7 +540,7 @@ def render_create_unit_common_ui(
                                 st.write("")  # IS, BN의 경우 빈 줄 추가
                                 st.write("")
                             
-                            if st.button(f"✨ Create {ad_unit['slot_key']} Ad Unit", use_container_width=True, type="primary", key=f"create_android_{ad_unit['slot_key'].lower()}_ad_unit"):
+                            if st.button(f"✨ Create {ad_unit['slot_key']} Ad Unit", width='stretch', type="primary", key=f"create_android_{ad_unit['slot_key'].lower()}_ad_unit"):
                                 with st.spinner(f"🚀 Creating Android {ad_unit['slot_key']} ad unit..."):
                                     try:
                                         payload = {
@@ -594,7 +594,7 @@ def render_create_unit_common_ui(
                 
                 # Use unique key with app_code to avoid duplicate key errors
                 button_key_android = f"create_android_ad_units_{selected_app_code}_{app_name}"
-                if st.button("✨ Create All 3 Ad Units (Android: RV, IS, BN)", use_container_width=True, type="primary", key=button_key_android):
+                if st.button("✨ Create All 3 Ad Units (Android: RV, IS, BN)", width='stretch', type="primary", key=button_key_android):
                     with st.spinner("🚀 Creating Android ad units..."):
                         try:
                             create_payloads = []
@@ -738,7 +738,7 @@ def render_create_unit_common_ui(
                                 st.write("")  # 빈 줄 1
                                 st.write("")  # 빈 줄 2
                             
-                            if st.button(f"✨ Create {ad_unit['slot_key']} Ad Unit", use_container_width=True, type="primary", key=f"create_ios_{ad_unit['slot_key'].lower()}_ad_unit"):
+                            if st.button(f"✨ Create {ad_unit['slot_key']} Ad Unit", width='stretch', type="primary", key=f"create_ios_{ad_unit['slot_key'].lower()}_ad_unit"):
                                 with st.spinner(f"🚀 Creating iOS {ad_unit['slot_key']} ad unit..."):
                                     try:
                                         payload = {
@@ -792,7 +792,7 @@ def render_create_unit_common_ui(
                 
                 # Use unique key with app_code to avoid duplicate key errors
                 button_key_ios = f"create_ios_ad_units_{selected_app_code}_{app_name}"
-                if st.button("✨ Create All 3 Ad Units (iOS: RV, IS, BN)", use_container_width=True, type="primary", key=button_key_ios):
+                if st.button("✨ Create All 3 Ad Units (iOS: RV, IS, BN)", width='stretch', type="primary", key=button_key_ios):
                     with st.spinner("🚀 Creating iOS ad units..."):
                         try:
                             create_payloads = []
@@ -898,7 +898,7 @@ def render_create_unit_common_ui(
                             break
             
             # Create All 3 Placements button
-            if st.button("✨ Create All 3 Placements (RV + IS + BN)", use_container_width=True, type="primary", key="create_all_inmobi_placements"):
+            if st.button("✨ Create All 3 Placements (RV + IS + BN)", width='stretch', type="primary", key="create_all_inmobi_placements"):
                 if not selected_app_code:
                     st.toast("❌ Please select an App Code", icon="🚫")
                 else:
@@ -1036,7 +1036,7 @@ def render_create_unit_common_ui(
                             break
             
             # Create All 3 Placements button
-            if st.button("✨ Create All 3 Placements (RV + IS + BN)", use_container_width=True, type="primary", key="create_all_fyber_placements"):
+            if st.button("✨ Create All 3 Placements (RV + IS + BN)", width='stretch', type="primary", key="create_all_fyber_placements"):
                 if not selected_app_code:
                     st.toast("❌ Please select an App Code", icon="🚫")
                 elif not app_id:
@@ -1269,7 +1269,7 @@ def _render_ironsource_slot_ui(slot_key, slot_config, selected_app_code, app_inf
     settings_html += '</ul></div>'
     st.markdown(settings_html, unsafe_allow_html=True)
     
-    if st.button(f"✅ Activate {slot_key} Ad Unit", use_container_width=True, key=f"activate_ironsource_{slot_key}"):
+    if st.button(f"✅ Activate {slot_key} Ad Unit", width='stretch', key=f"activate_ironsource_{slot_key}"):
         with st.spinner(f"Activating {slot_key} ad unit..."):
             try:
                 from utils.network_manager import get_network_manager
@@ -1497,7 +1497,7 @@ def _render_pangle_slot_ui(slot_key, slot_config, selected_app_code, app_info_to
             )
             slot_config["orientation"] = orientation[1]
     
-    if st.button(f"✅ Create {slot_key} Placement", use_container_width=True, key=f"create_pangle_{slot_key}"):
+    if st.button(f"✅ Create {slot_key} Placement", width='stretch', key=f"create_pangle_{slot_key}"):
         if not slot_name:
             st.toast("❌ Slot Name is required", icon="🚫")
         elif slot_key == "RV" and (not slot_config.get("reward_name") or slot_config.get("reward_count") is None):
@@ -1834,7 +1834,7 @@ def _render_mintegral_slot_ui(slot_key, slot_config, selected_app_code, app_info
             )
             slot_config["auto_fresh"] = auto_fresh[1]
     
-    if st.button(f"✅ Create {slot_key} Placement", use_container_width=True, key=f"create_mintegral_{slot_key}"):
+    if st.button(f"✅ Create {slot_key} Placement", width='stretch', key=f"create_mintegral_{slot_key}"):
         if not placement_name:
             st.toast("❌ Placement Name is required", icon="🚫")
         elif not app_id or app_id <= 0:
@@ -1996,7 +1996,7 @@ def _render_inmobi_slot_ui(slot_key, slot_config, selected_app_code, app_info_to
     settings_html += '</ul></div>'
     st.markdown(settings_html, unsafe_allow_html=True)
     
-    if st.button(f"✅ Create {slot_key} Placement", use_container_width=True, key=f"create_inmobi_{slot_key}"):
+    if st.button(f"✅ Create {slot_key} Placement", width='stretch', key=f"create_inmobi_{slot_key}"):
         if not selected_app_code:
             st.toast("❌ Please select an App Code", icon="🚫")
         elif not app_id or app_id <= 0:
@@ -2178,7 +2178,7 @@ def _render_fyber_slot_ui(slot_key, slot_config, selected_app_code, app_info_to_
     
     button_key = f"create_fyber_{slot_key}_{platform}" if platform else f"create_fyber_{slot_key}"
     button_label = f"✅ Create {slot_key} Placement ({platform.upper()})" if platform else f"✅ Create {slot_key} Placement"
-    if st.button(button_label, use_container_width=True, key=button_key):
+    if st.button(button_label, width='stretch', key=button_key):
         current_app_code = selected_app_code
         if not current_app_code:
             manual_code = st.session_state.get("manual_app_code_input", "")
@@ -2245,7 +2245,7 @@ def _render_fyber_slot_ui(slot_key, slot_config, selected_app_code, app_info_to_
                                 cached_units.append(unit_data)
                                 SessionManager.cache_units(current_network, str(app_id), cached_units)
                             
-                            if st.button("🔄 Refresh Page", key=f"refresh_after_{slot_key}", use_container_width=True):
+                            if st.button("🔄 Refresh Page", key=f"refresh_after_{slot_key}", width='stretch'):
                                 st.rerun()
                     except Exception as e:
                         st.error(f"❌ Error creating {slot_key} placement: {str(e)}")
@@ -2372,7 +2372,7 @@ def _render_bigoads_slot_ui(slot_key, slot_config, selected_app_code, app_info_t
             )
             slot_config['musicSwitch'] = MUSIC_SWITCH_REVERSE[new_music]
     
-    if st.button(f"✅ Create {slot_key} Slot", use_container_width=True, key=f"create_{slot_key}"):
+    if st.button(f"✅ Create {slot_key} Slot", width='stretch', key=f"create_{slot_key}"):
         # Log selected_app_code and slot_name for debugging
         logger.info(f"[BigOAds] Creating {slot_key} slot with appCode: {selected_app_code}, name: {slot_name}")
         logger.info(f"[BigOAds] selected_app_code type: {type(selected_app_code)}, value: {selected_app_code}")

@@ -669,7 +669,7 @@ def render_new_create_app_ui():
         )
     
     # Fetch button
-    fetch_info_button = st.button("🔍 앱 정보 조회", type="primary", use_container_width=True)
+    fetch_info_button = st.button("🔍 앱 정보 조회", type="primary", width='stretch')
     
     # Initialize session state
     if "store_info_ios" not in st.session_state:
@@ -834,14 +834,14 @@ def render_new_create_app_ui():
                     # Close dialog buttons
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ 확인", key="confirm_identifier_dialog", use_container_width=True, type="primary"):
+                        if st.button("✅ 확인", key="confirm_identifier_dialog", width='stretch', type="primary"):
                             st.rerun()
                     with col2:
-                        if st.button("❌ 취소", key="cancel_identifier_dialog", use_container_width=True):
+                        if st.button("❌ 취소", key="cancel_identifier_dialog", width='stretch'):
                             st.rerun()
                 
                 # Button to open dialog
-                if st.button("🔀 App match name 선택", key="open_identifier_dialog", use_container_width=True):
+                if st.button("🔀 App match name 선택", key="open_identifier_dialog", width='stretch'):
                     identifier_selection_dialog()
             else:
                 st.markdown("### 🔀 App match name")
@@ -988,7 +988,7 @@ def render_new_create_app_ui():
         # Select All / Deselect All buttons
         button_cols = st.columns([1, 1, 4])
         with button_cols[0]:
-            if st.button("✅ 모두 선택", key="select_all_networks", use_container_width=True):
+            if st.button("✅ 모두 선택", key="select_all_networks", width='stretch'):
                 # Select all networks
                 enabled_networks = list(available_networks.keys())
                 st.session_state.selected_networks = enabled_networks
@@ -998,7 +998,7 @@ def render_new_create_app_ui():
                 st.rerun()
         
         with button_cols[1]:
-            if st.button("❌ 선택 해제", key="deselect_all_networks", use_container_width=True):
+            if st.button("❌ 선택 해제", key="deselect_all_networks", width='stretch'):
                 st.session_state.selected_networks = []
                 # Update individual checkbox states
                 for network_key in available_networks.keys():
@@ -1513,7 +1513,7 @@ def render_new_create_app_ui():
             # Step 4: Create Apps
             st.markdown("### 4️⃣ 앱 생성")
             
-            create_button = st.button("🚀 선택한 네트워크에 앱 생성", type="primary", use_container_width=True, disabled=has_errors)
+            create_button = st.button("🚀 선택한 네트워크에 앱 생성", type="primary", width='stretch', disabled=has_errors)
             
             if create_button:
                 # Initialize results tracking
@@ -1867,7 +1867,7 @@ def render_new_create_app_ui():
                     if st.button(
                         "✅ Create All Units for All Networks (RV, IS, BN)",
                         key="create_all_units_all_networks",
-                        use_container_width=True,
+                        width='stretch',
                         type="primary"
                     ):
                         # Collect all units to create from all networks
@@ -2434,7 +2434,7 @@ def render_new_create_app_ui():
                                         if st.button(
                                             "✅ Create All Android Units (RV, IS, BN)",
                                             key=f"create_applovin_android_all",
-                                            use_container_width=True,
+                                            width='stretch',
                                             type="primary"
                                         ):
                                             success_count_android = 0
@@ -2549,7 +2549,7 @@ def render_new_create_app_ui():
                                         if st.button(
                                             "✅ Create All iOS Units (RV, IS, BN)",
                                             key=f"create_applovin_ios_all",
-                                            use_container_width=True,
+                                            width='stretch',
                                             type="primary"
                                         ):
                                             success_count_ios = 0
@@ -2900,7 +2900,7 @@ def render_new_create_app_ui():
                                         if st.button(
                                             f"✅ Create All {platform_display} Units (RV, IS, BN)",
                                             key=f"create_all_units_{network_key}_{platform_value}",
-                                            use_container_width=True,
+                                            width='stretch',
                                             type="primary"
                                         ):
                                             # Step 1: Deactivate existing placements for this app (Vungle requirement)
@@ -3195,7 +3195,7 @@ def render_new_create_app_ui():
                                             if st.button(
                                                 f"✅ Create {slot_type}",
                                                 key=f"create_unit_{network_key}_{slot_type}",
-                                                use_container_width=True
+                                                width='stretch'
                                             ):
                                                 # Ensure created_apps_by_network is preserved in session state
                                                 if "created_apps_by_network" not in st.session_state:
@@ -3337,7 +3337,7 @@ def render_new_create_app_ui():
                                     subset=["성공 여부"]
                                 )
                                 
-                                st.dataframe(df, use_container_width=True, hide_index=True)
+                                st.dataframe(df, width='stretch', hide_index=True)
                                 
                                 # Summary statistics
                                 total_apps = sum(len(r.get("apps", [])) for r in results.values())

@@ -76,7 +76,7 @@ def render_ironsource_get_instances(current_network: str):
     # GET Instance buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔍 GET Android Instances", use_container_width=True, type="primary", key="get_ironsource_android_instances"):
+        if st.button("🔍 GET Android Instances", width='stretch', type="primary", key="get_ironsource_android_instances"):
             if not android_app_key_input or not android_app_key_input.strip():
                 st.error("❌ Please enter an Android App Key")
             else:
@@ -115,7 +115,7 @@ def render_ironsource_get_instances(current_network: str):
                                     
                                     if instance_data:
                                         df = pd.DataFrame(instance_data)
-                                        st.dataframe(df, use_container_width=True, hide_index=True)
+                                        st.dataframe(df, width='stretch', hide_index=True)
                                         st.divider()
                             else:
                                 st.info("ℹ️ No instances found for this Android App Key")
@@ -132,7 +132,7 @@ def render_ironsource_get_instances(current_network: str):
                             st.code(traceback.format_exc())
     
     with col2:
-        if st.button("🔍 GET iOS Instances", use_container_width=True, type="primary", key="get_ironsource_ios_instances"):
+        if st.button("🔍 GET iOS Instances", width='stretch', type="primary", key="get_ironsource_ios_instances"):
             if not ios_app_key_input or not ios_app_key_input.strip():
                 st.error("❌ Please enter an iOS App Key")
             else:
@@ -171,7 +171,7 @@ def render_ironsource_get_instances(current_network: str):
                                     
                                     if instance_data:
                                         df = pd.DataFrame(instance_data)
-                                        st.dataframe(df, use_container_width=True, hide_index=True)
+                                        st.dataframe(df, width='stretch', hide_index=True)
                                         st.divider()
                             else:
                                 st.info("ℹ️ No instances found for this iOS App Key")

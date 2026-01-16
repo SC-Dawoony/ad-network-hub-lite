@@ -166,7 +166,7 @@ def render_unity_create_unit_ui(current_network: str):
                 st.markdown(f"  - **Placement Type**: `bidding`")
             
             # Create All 3 Ad Units button
-            if st.button(f"✅ Create All 3 Ad Units", use_container_width=True, type="primary", key=f"create_unity_all_{store_name}"):
+            if st.button(f"✅ Create All 3 Ad Units", width='stretch', type="primary", key=f"create_unity_all_{store_name}"):
                 # Build payload for all 3 ad units
                 payload = []
                 for slot_key, slot_config in unity_slot_configs.items():

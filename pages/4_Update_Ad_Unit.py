@@ -55,7 +55,7 @@
 #                     "Ad Unit ID": item.get("ad_unit_id", "N/A"),
 #                     "Status": "Success"
 #                 })
-#             st.dataframe(success_data, use_container_width=True, hide_index=True)
+#             st.dataframe(success_data, width='stretch', hide_index=True)
         
 #         # Fail list
 #         if last_result.get("fail"):
@@ -69,7 +69,7 @@
 #                     "Status Code": error_info.get("status_code", "N/A"),
 #                     "Error": json.dumps(error_info.get("data", {}), ensure_ascii=False)
 #                 })
-#             st.dataframe(fail_data, use_container_width=True, hide_index=True)
+#             st.dataframe(fail_data, width='stretch', hide_index=True)
         
 #         # Download result
 #         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -129,12 +129,12 @@
 #     with col2:
 #         st.write("")  # Spacing
 #         st.write("")  # Spacing
-#         if st.button("📡 조회", type="primary", use_container_width=True):
+#         if st.button("📡 조회", type="primary", width='stretch'):
 #             st.session_state.applovin_ad_units_raw = None
     
 #     # Load ad units data
 #     if "applovin_ad_units_raw" not in st.session_state or st.session_state.applovin_ad_units_raw is None:
-#         if st.button("📡 Get Ad Units", type="secondary", use_container_width=True):
+#         if st.button("📡 Get Ad Units", type="secondary", width='stretch'):
 #             # Show prominent loading message
 #             loading_placeholder = st.empty()
 #             with loading_placeholder.container():
@@ -448,7 +448,7 @@
 #                         # Select All / Deselect All buttons
 #                         button_cols = st.columns([1, 1, 4])
 #                         with button_cols[0]:
-#                             if st.button("✅ 모두 선택", key="select_all_ad_networks", use_container_width=True):
+#                             if st.button("✅ 모두 선택", key="select_all_ad_networks", width='stretch'):
 #                                 st.session_state.selected_ad_networks = AD_NETWORKS.copy()
 #                                 # Update individual checkbox states
 #                                 for applovin_network in AD_NETWORKS:
@@ -456,7 +456,7 @@
 #                                 st.rerun()
                         
 #                         with button_cols[1]:
-#                             if st.button("❌ 선택 해제", key="deselect_all_ad_networks", use_container_width=True):
+#                             if st.button("❌ 선택 해제", key="deselect_all_ad_networks", width='stretch'):
 #                                 st.session_state.selected_ad_networks = []
 #                                 # Update individual checkbox states
 #                                 for applovin_network in AD_NETWORKS:
@@ -500,7 +500,7 @@
                     
 #                     # Add button - only show when not processing and networks are selected
 #                     if st.session_state.selected_ad_networks and not is_processing:
-#                         if st.button(f"➕ 선택한 {len(selected_rows_dict)}개 Ad Units + {len(st.session_state.selected_ad_networks)}개 네트워크 추가", type="primary", use_container_width=True):
+#                         if st.button(f"➕ 선택한 {len(selected_rows_dict)}개 Ad Units + {len(st.session_state.selected_ad_networks)}개 네트워크 추가", type="primary", width='stretch'):
 #                             # Mark as processing to prevent UI layout issues
 #                             st.session_state[processing_key] = True
                             
@@ -1227,7 +1227,7 @@
 # edited_df = st.data_editor(
 #     data_to_display if len(data_to_display) > 0 else st.session_state.applovin_data,
 #     num_rows="dynamic",
-#     use_container_width=True,
+#     width='stretch',
 #     key=data_editor_key,
 #     column_config={
 #         "id": st.column_config.TextColumn(
@@ -1358,7 +1358,7 @@
 #     if len(df_to_validate) > 0:
 #         st.divider()
         
-#         if st.button("🚀 Update All Ad Units", type="primary", use_container_width=True):
+#         if st.button("🚀 Update All Ad Units", type="primary", width='stretch'):
 #             # Use df_to_validate (already filtered and merged)
 #             df_to_process = df_to_validate.copy()
             
@@ -1477,7 +1477,7 @@
 #                                 "Ad Unit ID": item["ad_unit_id"],
 #                                 "Status": "Success"
 #                             })
-#                         st.dataframe(success_data, use_container_width=True, hide_index=True)
+#                         st.dataframe(success_data, width='stretch', hide_index=True)
                     
 #                     # Fail list
 #                     if result["fail"]:
@@ -1491,7 +1491,7 @@
 #                                 "Status Code": error_info.get("status_code", "N/A"),
 #                                 "Error": json.dumps(error_info.get("data", {}), ensure_ascii=False)
 #                             })
-#                         st.dataframe(fail_data, use_container_width=True, hide_index=True)
+#                         st.dataframe(fail_data, width='stretch', hide_index=True)
                     
 #                     # Download result
 #                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1568,7 +1568,7 @@ if "applovin_update_result" in st.session_state:
                     "Ad Unit ID": item.get("ad_unit_id", "N/A"),
                     "Status": "Success"
                 })
-            st.dataframe(success_data, use_container_width=True, hide_index=True)
+            st.dataframe(success_data, width='stretch', hide_index=True)
         
         # Fail list
         if last_result.get("fail"):
@@ -1582,7 +1582,7 @@ if "applovin_update_result" in st.session_state:
                     "Status Code": error_info.get("status_code", "N/A"),
                     "Error": json.dumps(error_info.get("data", {}), ensure_ascii=False)
                 })
-            st.dataframe(fail_data, use_container_width=True, hide_index=True)
+            st.dataframe(fail_data, width='stretch', hide_index=True)
         
         # Download result
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1642,12 +1642,12 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
     with col2:
         st.write("")  # Spacing
         st.write("")  # Spacing
-        if st.button("📡 조회", type="primary", use_container_width=True):
+        if st.button("📡 조회", type="primary", width='stretch'):
             st.session_state.applovin_ad_units_raw = None
     
     # Load ad units data
     if "applovin_ad_units_raw" not in st.session_state or st.session_state.applovin_ad_units_raw is None:
-        if st.button("📡 Get Ad Units", type="secondary", use_container_width=True):
+        if st.button("📡 Get Ad Units", type="secondary", width='stretch'):
             # Show prominent loading message
             loading_placeholder = st.empty()
             with loading_placeholder.container():
@@ -1869,7 +1869,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                         checkbox_key = f"ad_unit_checkbox_{unit_id}"
                         # Always read latest value from session_state to reflect button clicks
                         current_value = st.session_state.ad_unit_selections.get(unit_id, False)
-                        new_selection = st.checkbox("", value=current_value, key=checkbox_key, label_visibility="collapsed")
+                        new_selection = st.checkbox("Select ad unit", value=current_value, key=checkbox_key, label_visibility="collapsed")
                         
                         # Always update session state to keep it in sync
                         # This ensures button clicks are reflected in checkboxes
@@ -1969,7 +1969,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                         # Select All / Deselect All buttons
                         button_cols = st.columns([1, 1, 4])
                         with button_cols[0]:
-                            if st.button("✅ 모두 선택", key="select_all_ad_networks", use_container_width=True):
+                            if st.button("✅ 모두 선택", key="select_all_ad_networks", width='stretch'):
                                 st.session_state.selected_ad_networks = AD_NETWORKS.copy()
                                 # Update individual checkbox states
                                 for applovin_network in AD_NETWORKS:
@@ -1977,7 +1977,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                 st.rerun()
                         
                         with button_cols[1]:
-                            if st.button("❌ 선택 해제", key="deselect_all_ad_networks", use_container_width=True):
+                            if st.button("❌ 선택 해제", key="deselect_all_ad_networks", width='stretch'):
                                 st.session_state.selected_ad_networks = []
                                 # Update individual checkbox states
                                 for applovin_network in AD_NETWORKS:
@@ -2021,7 +2021,7 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                     
                     # Add button - only show when not processing and networks are selected
                     if st.session_state.selected_ad_networks and not is_processing:
-                        if st.button(f"➕ 선택한 {len(selected_rows_dict)}개 Ad Units + {len(st.session_state.selected_ad_networks)}개 네트워크 추가", type="primary", use_container_width=True):
+                        if st.button(f"➕ 선택한 {len(selected_rows_dict)}개 Ad Units + {len(st.session_state.selected_ad_networks)}개 네트워크 추가", type="primary", width='stretch'):
                             # Mark as processing to prevent UI layout issues
                             st.session_state[processing_key] = True
                             
@@ -3077,7 +3077,7 @@ data_editor_key = "applovin_data_editor"
 edited_df = st.data_editor(
     st.session_state.applovin_data,
     num_rows="dynamic",
-    use_container_width=True,
+    width='stretch',
     key=data_editor_key,
     column_config={
         "id": st.column_config.TextColumn(
@@ -3168,7 +3168,7 @@ st.divider()
 if len(edited_df) > 0:
     st.divider()
     
-    if st.button("🚀 Update All Ad Units", type="primary", use_container_width=True):
+    if st.button("🚀 Update All Ad Units", type="primary", width='stretch'):
         # Save edited data to session_state before validation and API call
         df_to_process = edited_df.copy()
         
@@ -3273,7 +3273,7 @@ if len(edited_df) > 0:
                                 "Ad Unit ID": item["ad_unit_id"],
                                 "Status": "Success"
                             })
-                        st.dataframe(success_data, use_container_width=True, hide_index=True)
+                        st.dataframe(success_data, width='stretch', hide_index=True)
                     
                     # Fail list
                     if result["fail"]:
@@ -3287,7 +3287,7 @@ if len(edited_df) > 0:
                                 "Status Code": error_info.get("status_code", "N/A"),
                                 "Error": json.dumps(error_info.get("data", {}), ensure_ascii=False)
                             })
-                        st.dataframe(fail_data, use_container_width=True, hide_index=True)
+                        st.dataframe(fail_data, width='stretch', hide_index=True)
                     
                     # Download result
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

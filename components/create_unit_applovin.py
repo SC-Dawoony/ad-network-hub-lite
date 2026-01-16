@@ -38,7 +38,7 @@ def render_applovin_create_unit_ui():
     st.info("💡 **Note:** Ad Units will be created for both Android and iOS platforms automatically.")
     
     # Create All Ad Units button
-    if st.button("✨ Create All 6 Ad Units (Android + iOS: RV, IS, BN)", use_container_width=True, type="primary", key="create_all_applovin_units"):
+    if st.button("✨ Create All 6 Ad Units (Android + iOS: RV, IS, BN)", width='stretch', type="primary", key="create_all_applovin_units"):
         if not package_name:
             st.error("❌ Package Name is required")
         else:
@@ -297,7 +297,7 @@ def render_applovin_create_unit_ui():
                     st.markdown(settings_html, unsafe_allow_html=True)
                     
                     # Create button for AppLovin
-                    if st.button(f"✅ Create {slot_key} ({platform_display})", use_container_width=True, key=f"create_applovin_{platform}_{slot_key}"):
+                    if st.button(f"✅ Create {slot_key} ({platform_display})", width='stretch', key=f"create_applovin_{platform}_{slot_key}"):
                         # Validate inputs
                         if not slot_name:
                             st.toast("❌ Ad Unit Name is required", icon="🚫")

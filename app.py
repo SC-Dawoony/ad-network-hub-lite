@@ -75,10 +75,10 @@ with st.sidebar:
     # Quick actions
     st.subheader("Quick Actions")
     
-    if st.button("🎯 Create Unit", use_container_width=True):
+    if st.button("🎯 Create Unit", width='stretch'):
         switch_to_page(".hidden_Create_Unit.py")
     
-    if st.button("⚙️ Update Ad Unit", use_container_width=True):
+    if st.button("⚙️ Update Ad Unit", width='stretch'):
         switch_to_page("4_Update_Ad_Unit.py")
     
     st.divider()
@@ -202,7 +202,7 @@ for network in available_networks:
     })
 
 if stats_data:
-    st.dataframe(stats_data, use_container_width=True, hide_index=True)
+    st.dataframe(stats_data, width='stretch', hide_index=True)
 else:
     st.info("No data available. Use 'View Lists' to fetch data from networks.")
 
