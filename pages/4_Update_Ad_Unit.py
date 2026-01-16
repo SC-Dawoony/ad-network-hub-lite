@@ -2241,10 +2241,18 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     app_key = app_ids.get("app_key") or app_ids.get("app_code")
                                     app_id = app_ids.get("app_id")
                                     
-                                    # Debug logging for Mintegral
+                                    # Debug logging for matched apps (all networks)
                                     if actual_network == "mintegral":
                                         logger.debug(f"[Mintegral] Matched app: {matched_app.get('name', 'N/A')}, app_id: {matched_app.get('app_id', 'N/A')}, platform: {matched_app.get('platform', 'N/A')}")
                                         logger.debug(f"[Mintegral] Extracted app_id: {app_id}, app_key: {app_key}, app_code: {app_ids.get('app_code')}")
+                                    elif actual_network == "ironsource":
+                                        logger.info(f"[IronSource] ✅ Matched app: {matched_app.get('name', 'N/A')} (appKey: {app_key})")
+                                    elif actual_network == "inmobi":
+                                        logger.info(f"[InMobi] ✅ Matched app: {matched_app.get('name', 'N/A')} (appId: {app_id})")
+                                    elif actual_network == "unity":
+                                        logger.info(f"[Unity] ✅ Matched app: {matched_app.get('name', 'N/A')} (projectId: {app_id})")
+                                    elif actual_network == "vungle":
+                                        logger.info(f"[Vungle] ✅ Matched app: {matched_app.get('name', 'N/A')} (appId: {app_id})")
                                     
                                     # For BigOAds, ensure app_key is set (fallback to app_id if app_code is missing)
                                     # Also handle case where app_code is "N/A" or empty string
@@ -2267,12 +2275,8 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     
                                     # Debug logging for Fyber
                                     if actual_network == "fyber":
-                                        logger.info(f"[Fyber] Matched app: {matched_app.get('name', 'N/A')}")
-                                        logger.info(f"[Fyber] Matched app keys: {list(matched_app.keys())}")
-                                        logger.info(f"[Fyber] Matched app platform: {matched_app.get('platform', 'N/A')}")
-                                        logger.info(f"[Fyber] Matched app appId: {matched_app.get('appId', 'N/A')}, id: {matched_app.get('id', 'N/A')}")
-                                        logger.info(f"[Fyber] Extracted app_ids: {app_ids}")
-                                        logger.info(f"[Fyber] Extracted app_id: {app_id}, app_key: {app_key}")
+                                        logger.info(f"[Fyber] ✅ Matched app: {matched_app.get('name', 'N/A')} (appId: {app_id})")
+                                        logger.debug(f"[Fyber] Extracted app_id: {app_id}, platform: {matched_app.get('platform', 'N/A')}")
                                     
                                     # For Unity, use projectId to get units
                                     if actual_network == "unity":
@@ -2285,21 +2289,14 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                         # Pangle: Query all ad units, filter by app_id on client side
                                         # app_id will be passed to get_pangle_units for client-side filtering
                                         if app_id:
-                                            logger.info(f"[Pangle] Will query all ad units and filter by app_id: {app_id} on client side")
+                                            logger.debug(f"[Pangle] Will query all ad units and filter by app_id: {app_id} on client side")
                                         else:
-                                            logger.warning(f"[Pangle] app_id not available, will query all ad units")
+                                            logger.warning(f"[Pangle] ⚠️ app_id not available, will query all ad units")
                                     
                                     # Debug logging for BigOAds
                                     if actual_network == "bigoads":
-                                        logger.info(f"[BigOAds] ========== Debug Info ==========")
-                                        logger.info(f"[BigOAds] Ad Format: {applovin_unit.get('ad_format')}")
-                                        logger.info(f"[BigOAds] Platform: {applovin_unit.get('platform')}")
-                                        logger.info(f"[BigOAds] Matched app: {matched_app.get('name', 'N/A')}")
-                                        logger.info(f"[BigOAds] Matched app keys: {list(matched_app.keys())}")
-                                        logger.info(f"[BigOAds] Matched app appCode: {matched_app.get('appCode', 'N/A')}")
-                                        logger.info(f"[BigOAds] Matched app platform: {matched_app.get('platform', 'N/A')}")
-                                        logger.info(f"[BigOAds] Extracted app_ids: {app_ids}")
-                                        logger.info(f"[BigOAds] Extracted app_code: {app_ids.get('app_code')}, app_key: {app_key}, app_id: {app_id}")
+                                        logger.info(f"[BigOAds] ✅ Matched app: {matched_app.get('name', 'N/A')} (appCode: {app_key})")
+                                        logger.debug(f"[BigOAds] Extracted app_code: {app_ids.get('app_code')}, app_key: {app_key}, app_id: {app_id}")
                                     
                                     # Get units for this app (sequential: app -> units)
                                     # For Pangle, query all ad units and filter by app_id on client side
@@ -2311,33 +2308,61 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     else:
                                         unit_lookup_id = app_key or app_id or ""
                                     
-                                    # Debug logging for Mintegral before get_network_units
+                                    # Debug logging before get_network_units
                                     if actual_network == "mintegral":
                                         logger.debug(f"[Mintegral] Getting units: unit_lookup_id={unit_lookup_id}, app_id={app_id}, app_key={app_key}")
+                                    elif actual_network == "ironsource":
+                                        logger.debug(f"[IronSource] Getting units: appKey={unit_lookup_id}")
+                                    elif actual_network == "inmobi":
+                                        logger.debug(f"[InMobi] Getting units: appId={unit_lookup_id}")
+                                    elif actual_network == "unity":
+                                        logger.debug(f"[Unity] Getting units: projectId={unit_lookup_id}")
+                                    elif actual_network == "vungle":
+                                        logger.debug(f"[Vungle] Getting units: appId={unit_lookup_id}")
                                     
                                     units = get_network_units(actual_network, unit_lookup_id)
                                     
-                                    # Debug logging for Mintegral units
+                                    # Debug logging for units retrieval (all networks)
                                     if actual_network == "mintegral":
                                         if units:
                                             logger.debug(f"[Mintegral] Retrieved {len(units)} units")
                                         else:
-                                            logger.warning(f"[Mintegral] No units returned from API (unit_lookup_id: {unit_lookup_id})")
-                                    
-                                    # Debug logging for BigOAds units
-                                    if actual_network == "bigoads":
-                                        logger.info(f"[BigOAds] Units count: {len(units) if units else 0}")
+                                            logger.warning(f"[Mintegral] ⚠️ No units returned from API (unit_lookup_id: {unit_lookup_id})")
+                                    elif actual_network == "ironsource":
                                         if units:
-                                            logger.info(f"[BigOAds] First unit: {units[0]}")
-                                    
-                                    # Debug logging for Pangle units
-                                    if actual_network == "pangle":
-                                        logger.info(f"[Pangle] Units count: {len(units) if units else 0}")
-                                        if units:
-                                            logger.info(f"[Pangle] First unit keys: {list(units[0].keys()) if units else []}")
+                                            logger.info(f"[IronSource] Retrieved {len(units)} instances")
                                         else:
-                                            logger.warning(f"[Pangle] No units returned from API!")
-                                            logger.warning(f"[Pangle] app_id used for API call: {app_id}")
+                                            logger.warning(f"[IronSource] ⚠️ No instances returned from API (appKey: {unit_lookup_id})")
+                                    elif actual_network == "inmobi":
+                                        if units:
+                                            logger.info(f"[InMobi] Retrieved {len(units)} placements")
+                                        else:
+                                            logger.warning(f"[InMobi] ⚠️ No placements returned from API (appId: {unit_lookup_id})")
+                                    elif actual_network == "fyber":
+                                        if units:
+                                            logger.info(f"[Fyber] Retrieved {len(units)} placements")
+                                        else:
+                                            logger.warning(f"[Fyber] ⚠️ No placements returned from API (appId: {unit_lookup_id})")
+                                    elif actual_network == "bigoads":
+                                        if units:
+                                            logger.info(f"[BigOAds] Retrieved {len(units)} slots")
+                                        else:
+                                            logger.warning(f"[BigOAds] ⚠️ No slots returned from API (appCode: {unit_lookup_id})")
+                                    elif actual_network == "vungle":
+                                        if units:
+                                            logger.info(f"[Vungle] Retrieved {len(units)} placements")
+                                        else:
+                                            logger.warning(f"[Vungle] ⚠️ No placements returned from API (appId: {unit_lookup_id})")
+                                    elif actual_network == "unity":
+                                        if units:
+                                            logger.info(f"[Unity] Retrieved {len(units)} ad units")
+                                        else:
+                                            logger.warning(f"[Unity] ⚠️ No ad units returned from API (projectId: {unit_lookup_id})")
+                                    elif actual_network == "pangle":
+                                        if units:
+                                            logger.info(f"[Pangle] Retrieved {len(units)} ad slots")
+                                        else:
+                                            logger.warning(f"[Pangle] ⚠️ No ad slots returned from API (appId: {app_id})")
                                     
                                     # Find matching unit by ad_format
                                     matched_unit = None
@@ -2349,63 +2374,50 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                             applovin_unit["platform"]
                                         )
                                         
-                                        # Debug logging for Mintegral unit matching
+                                        # Debug logging for unit matching (all networks)
                                         if actual_network == "mintegral":
                                             if matched_unit:
                                                 logger.info(f"[Mintegral] ✅ Matched unit: {matched_unit.get('placement_name', 'N/A')} (placement_id: {matched_unit.get('placement_id', 'N/A')})")
                                             else:
                                                 logger.warning(f"[Mintegral] ⚠️ No unit matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} units)")
                                                 logger.debug(f"[Mintegral] Available units ad_type: {[u.get('ad_type') for u in units]}")
-                                        
-                                        # Debug logging for Vungle
-                                        if actual_network == "vungle":
+                                        elif actual_network == "ironsource":
                                             if matched_unit:
-                                                logger.info(f"[Vungle] Matched unit: {matched_unit.get('name', 'N/A')}")
-                                                logger.info(f"[Vungle] referenceID: {matched_unit.get('referenceID', 'N/A')}")
-                                                logger.info(f"[Vungle] All keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[IronSource] ✅ Matched instance: {matched_unit.get('instanceId', 'N/A')} (adFormat: {matched_unit.get('adFormat', 'N/A')})")
                                             else:
-                                                logger.warning(f"[Vungle] No unit matched!")
-                                                if units:
-                                                    logger.info(f"[Vungle] Available units: {len(units)}")
-                                                    logger.info(f"[Vungle] First unit keys: {list(units[0].keys()) if units else []}")
-                                        
-                                        # Debug logging for BigOAds unit matching
-                                        if actual_network == "bigoads":
-                                            logger.info(f"[BigOAds] ========== Unit Matching ==========")
-                                            logger.info(f"[BigOAds] Ad format: {applovin_unit['ad_format']}")
-                                            logger.info(f"[BigOAds] Platform: {applovin_unit['platform']}")
-                                            logger.info(f"[BigOAds] Total units available: {len(units)}")
-                                            if units:
-                                                logger.info(f"[BigOAds] All units adType: {[u.get('adType') for u in units]}")
-                                                logger.info(f"[BigOAds] All units name: {[u.get('name') for u in units]}")
-                                            logger.info(f"[BigOAds] Matched unit: {matched_unit}")
+                                                logger.warning(f"[IronSource] ⚠️ No instance matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} instances)")
+                                        elif actual_network == "inmobi":
                                             if matched_unit:
-                                                logger.info(f"[BigOAds] Matched unit name: {matched_unit.get('name', 'N/A')}")
-                                                logger.info(f"[BigOAds] Matched unit slotCode: {matched_unit.get('slotCode', 'N/A')}")
-                                                logger.info(f"[BigOAds] Matched unit adType: {matched_unit.get('adType', 'N/A')}")
+                                                logger.info(f"[InMobi] ✅ Matched placement: {matched_unit.get('placementName', 'N/A')} (placementId: {matched_unit.get('placementId', 'N/A')})")
                                             else:
-                                                logger.warning(f"[BigOAds] No unit matched!")
-                                                logger.warning(f"[BigOAds] This means ad_network_app_id should still be set from app_key: {app_key}")
-                                        
-                                        # Debug logging for Pangle unit matching
-                                        if actual_network == "pangle":
-                                            logger.info(f"[Pangle] ========== Unit Matching ==========")
-                                            logger.info(f"[Pangle] Ad format: {applovin_unit['ad_format']}")
-                                            logger.info(f"[Pangle] Platform: {applovin_unit['platform']}")
-                                            logger.info(f"[Pangle] Total units available: {len(units)}")
-                                            if units:
-                                                logger.info(f"[Pangle] All units ad_slot_type: {[u.get('ad_slot_type') for u in units]}")
-                                                logger.info(f"[Pangle] All units ad_slot_name: {[u.get('ad_slot_name') for u in units]}")
-                                                logger.info(f"[Pangle] All units ad_slot_id: {[u.get('ad_slot_id') for u in units]}")
-                                            logger.info(f"[Pangle] Matched unit: {matched_unit}")
+                                                logger.warning(f"[InMobi] ⚠️ No placement matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} placements)")
+                                        elif actual_network == "fyber":
                                             if matched_unit:
-                                                logger.info(f"[Pangle] Matched unit ad_slot_name: {matched_unit.get('ad_slot_name', 'N/A')}")
-                                                logger.info(f"[Pangle] Matched unit ad_slot_id: {matched_unit.get('ad_slot_id', 'N/A')}")
-                                                logger.info(f"[Pangle] Matched unit ad_slot_type: {matched_unit.get('ad_slot_type', 'N/A')}")
-                                                logger.info(f"[Pangle] Matched unit all keys: {list(matched_unit.keys())}")
+                                                logger.info(f"[Fyber] ✅ Matched placement: {matched_unit.get('name', 'N/A')} (placementId: {matched_unit.get('placementId', 'N/A')})")
                                             else:
-                                                logger.warning(f"[Pangle] No unit matched!")
-                                                logger.warning(f"[Pangle] This means ad_network_app_id should still be set from app_id: {app_id}")
+                                                logger.warning(f"[Fyber] ⚠️ No placement matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} placements)")
+                                        elif actual_network == "bigoads":
+                                            if matched_unit:
+                                                logger.info(f"[BigOAds] ✅ Matched slot: {matched_unit.get('name', 'N/A')} (slotCode: {matched_unit.get('slotCode', 'N/A')})")
+                                            else:
+                                                logger.warning(f"[BigOAds] ⚠️ No slot matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} slots)")
+                                                logger.debug(f"[BigOAds] Available slots adType: {[u.get('adType') for u in units]}")
+                                        elif actual_network == "vungle":
+                                            if matched_unit:
+                                                logger.info(f"[Vungle] ✅ Matched placement: {matched_unit.get('name', 'N/A')} (referenceID: {matched_unit.get('referenceID', 'N/A')})")
+                                            else:
+                                                logger.warning(f"[Vungle] ⚠️ No placement matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} placements)")
+                                        elif actual_network == "unity":
+                                            if matched_unit:
+                                                logger.info(f"[Unity] ✅ Matched ad unit: {matched_unit.get('name', 'N/A')} (id: {matched_unit.get('id', 'N/A')})")
+                                            else:
+                                                logger.warning(f"[Unity] ⚠️ No ad unit matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} ad units)")
+                                        elif actual_network == "pangle":
+                                            if matched_unit:
+                                                logger.info(f"[Pangle] ✅ Matched ad slot: {matched_unit.get('ad_slot_name', 'N/A')} (ad_slot_id: {matched_unit.get('ad_slot_id', 'N/A')})")
+                                            else:
+                                                logger.warning(f"[Pangle] ⚠️ No ad slot matched for format={applovin_unit['ad_format']}, platform={applovin_unit['platform']} (available: {len(units)} ad slots)")
+                                                logger.debug(f"[Pangle] Available slots ad_slot_type: {[u.get('ad_slot_type') for u in units]}")
                                     else:
                                         # No units found
                                         if actual_network == "bigoads":
@@ -2713,7 +2725,28 @@ with st.expander("📡 AppLovin Ad Units 조회 및 검색", expanded=False):
                                     
                                     return row, result_info
                                 else:
-                                    # App not found
+                                    # App not found - log warning for all networks
+                                    package_name = applovin_unit.get("package_name", "")
+                                    app_name = applovin_unit.get("name", "")
+                                    platform = applovin_unit.get("platform", "")
+                                    
+                                    if actual_network == "ironsource":
+                                        logger.warning(f"[IronSource] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "inmobi":
+                                        logger.warning(f"[InMobi] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "mintegral":
+                                        logger.warning(f"[Mintegral] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "fyber":
+                                        logger.warning(f"[Fyber] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "bigoads":
+                                        logger.warning(f"[BigOAds] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "vungle":
+                                        logger.warning(f"[Vungle] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "unity":
+                                        logger.warning(f"[Unity] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    elif actual_network == "pangle":
+                                        logger.warning(f"[Pangle] ⚠️ App not found: name='{app_name}', package_name='{package_name}', platform={platform}")
+                                    
                                     # For InMobi, still use fixed value for ad_network_app_id
                                     # For Mintegral, still use fixed value for ad_network_app_key
                                     # For Fyber, empty both fields
